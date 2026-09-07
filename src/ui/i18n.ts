@@ -57,7 +57,8 @@ const COPY = {
     historyKeys: "↑/PageUp: 이전 · ↓/PageDown: 최근 · Esc: 돌아가기",
     noUnread: "안 읽은 대화가 없습니다.",
     waitingConversations: "대화 목록을 기다리는 중…",
-    instagramLoginRequired: "Instagram 로그인이 필요합니다. `oh-my-dm login instagram`을 실행하세요.",
+    providerLoginRequired: (label: string, id: string) =>
+      label + " 로그인이 필요합니다. `oh-my-dm login " + id + "`을 실행하세요.",
     manageConnectors: "Connector 관리",
     chatConnectors: "채팅 connectors",
     storage: "세션 전용 · 메시지는 저장하지 않음",
@@ -111,7 +112,8 @@ const COPY = {
     historyKeys: "↑/PageUp: older · ↓/PageDown: latest · Esc: back",
     noUnread: "No unread conversations.",
     waitingConversations: "Waiting for conversations…",
-    instagramLoginRequired: "Instagram login required. Run `oh-my-dm login instagram`.",
+    providerLoginRequired: (label: string, id: string) =>
+      label + " login required. Run `oh-my-dm login " + id + "`.",
     manageConnectors: "Manage connectors",
     chatConnectors: "Chat connectors",
     storage: "session only · messages are not persisted",

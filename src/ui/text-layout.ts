@@ -35,11 +35,20 @@ export interface ConversationLayout {
   previewWidth: number;
 }
 
-export function getConversationLayout(terminalColumns: number): ConversationLayout {
+export function getConversationLayout(
+  terminalColumns: number,
+  // Defaults to the two connectors that shipped before Discord so the
+  // width stays 9/25 for callers that do not know the provider list yet.
+  providerLabels: readonly string[] = ["Instagram", "KakaoTalk"],
+): ConversationLayout {
   const contentWidth = Math.max(1, terminalColumns - 6);
   const showPreview = terminalColumns >= 70;
   const compactTabs = terminalColumns < 32;
-  const tabsWidth = Math.min(contentWidth, compactTabs ? 9 : 25);
+  const labels = providerLabels.length > 0 ? providerLabels : ["Instagram"];
+  const naturalTabsWidth =
+    labels.reduce((total, label) => total + (compactTabs ? 3 : label.length + 2), 0) +
+    Math.max(0, labels.length - 1) * 3;
+  const tabsWidth = Math.min(contentWidth, naturalTabsWidth);
   const pathWidth = Math.max(0, contentWidth - tabsWidth);
   const titleWidth = showPreview
     ? Math.max(8, Math.min(32, Math.floor(contentWidth * 0.38)))

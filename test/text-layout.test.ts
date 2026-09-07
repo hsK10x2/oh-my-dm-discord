@@ -46,3 +46,15 @@ test("메시지를 입력하기 시작하면 composer 단축키 안내를 숨긴
   assert.equal(shouldShowComposerHints(80, "메시지 입력 중"), false);
   assert.equal(shouldShowComposerHints(71, ""), false);
 });
+
+test("connector가 늘어나면 탭 폭도 함께 넓어진다", () => {
+  const three = getConversationLayout(120, ["Instagram", "Discord", "KakaoTalk"]);
+  // " Instagram "(11) + " │ "(3) + " Discord "(9) + " │ "(3) + " KakaoTalk "(11)
+  assert.equal(three.tabsWidth, 37);
+  assert.ok(three.pathWidth + three.tabsWidth <= three.contentWidth);
+
+  const compact = getConversationLayout(31, ["Instagram", "Discord", "KakaoTalk"]);
+  assert.equal(compact.compactTabs, true);
+  assert.equal(compact.tabsWidth, 15);
+  assert.ok(compact.pathWidth + compact.tabsWidth <= compact.contentWidth);
+});

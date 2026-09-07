@@ -15,10 +15,11 @@ export interface UiTheme {
   muted: string;
 }
 
-export const CONNECTOR_COLORS = {
+export const CONNECTOR_COLORS: Record<string, string> = {
   instagram: "#E1306C",
+  discord: "#5865F2",
   kakaotalk: "#FEE500",
-} as const;
+};
 
 export const UI_THEMES: UiTheme[] = [
   {

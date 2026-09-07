@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+
 
 const LATEST_PACKAGE_URL = "https://registry.npmjs.org/oh-my-dm/latest";
 
@@ -32,20 +32,21 @@ export async function checkForUpdate(
   }
 }
 
-export function installLatestVersion(options: { silent?: boolean } = {}): Promise<void> {
-  const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-  return new Promise((resolve, reject) => {
-    const child = spawn(
-      npmCommand,
-      ["install", "--global", "--allow-scripts=oh-my-dm", "oh-my-dm@latest"],
-      { stdio: options.silent ? "ignore" : "inherit" },
-    );
-    child.once("error", reject);
-    child.once("exit", (code, signal) => {
-      if (code === 0) resolve();
-      else reject(new Error(`npm update failed (${signal ?? code ?? "unknown"})`));
-    });
-  });
+export const FORK_UPDATE_INSTRUCTIONS = [
+  "이 빌드는 포크라 npm에 없습니다. 자기 자신을 업데이트할 수 없습니다.",
+  "This build is a fork and is not on npm, so it cannot update itself.",
+  "",
+  "업데이트하려면 / To update, in your checkout:",
+  "  git pull && npm install && npm run build",
+].join("\n");
+
+/**
+ * Upstream installs `oh-my-dm@latest` from npm here. In this fork that would
+ * replace the running build with upstream and silently drop the Discord
+ * connector, so the npm path is removed rather than left as a footgun.
+ */
+export function installLatestVersion(_options: { silent?: boolean } = {}): Promise<void> {
+  return Promise.reject(new Error(FORK_UPDATE_INSTRUCTIONS));
 }
 
 function parseVersion(value: string): [number, number, number] | undefined {

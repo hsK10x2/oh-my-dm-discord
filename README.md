@@ -1,5 +1,19 @@
 # oh-my-dm
 
+> **This is a modified fork.**
+> Upstream: [stacking-money-forever/oh-my-dm](https://github.com/stacking-money-forever/oh-my-dm)
+> by Hyunwoo Gu (구현우), licensed under Apache-2.0. This copy is not affiliated with,
+> nor endorsed by, the original author.
+>
+> **원본에서 바뀐 점 / Changes from upstream** — see [CHANGES.md](CHANGES.md):
+> - Added a **Discord** DM connector (Playwright, `discord.com/channels/@me`)
+> - **KakaoTalk is no longer registered off macOS** — KakaoTalk for Windows exposes no
+>   chat text through UI Automation or MSAA, so there is nothing to read there
+> - Generalised the TUI from two hard-coded connectors to an N-connector list
+> - Extracted the browser-profile helpers into `src/browser/profile.ts`
+> - Fixed a crash where a refresh scheduled before teardown raised an unhandled
+>   `error` event and killed `oh-my-dm login`
+
 ![oh-my-dm terminal interface](docs/screenshot.png)
 
 [한국어](#한국어) · [English](#english)
@@ -19,6 +33,9 @@ Node.js 22 이상이 필요합니다. 설치 없이 최신 버전을 바로 실�
 ```bash
 # Instagram 최초 로그인
 npx oh-my-dm@latest login instagram
+
+# Discord 최초 로그인
+npx oh-my-dm@latest login discord
 
 # 실행
 npx oh-my-dm@latest
@@ -53,6 +70,7 @@ npx oh-my-dm@latest
 - 터미널에서 대화 목록 조회와 텍스트 메시지 송수신
 - 사진, 영상, 릴스, 게시물, 이모티콘, 공감, 답장, 수정, 삭제와 시스템 안내를 공통 메시지 타입으로 정규화
 - 그룹 대화의 실제 발신자 이름 표시
+- Discord DM 대화 목록·메시지 조회와 전송
 - macOS 카카오톡 대화 목록·메시지 조회와 전송
 - 하나의 통합 대화 목록 사용 및 `/connectors`에서 연결 상태 확인
 - DOM과 WebSocket wake-up signal을 통한 event-driven 업데이트
@@ -106,7 +124,8 @@ oh-my-dm logout instagram
 | Connector | 지원 범위 | 참고 |
 | --- | --- | --- |
 | Instagram | macOS와 Linux에서 CI 검증 | 번들된 Playwright Chromium을 사용합니다. Windows는 아직 공식 검증되지 않았습니다. |
-| 카카오톡 | macOS 전용 | 데스크톱 카카오톡 앱 로그인과 손쉬운 사용 권한이 필요합니다. |
+| Discord | macOS, Linux, Windows | 번들된 Playwright Chromium으로 `discord.com/channels/@me`의 DM을 읽고 씁니다. 개인 DM 전용이며 서버 채널은 다루지 않습니다. |
+| 카카오톡 | macOS 전용 | 데스크톱 카카오톡 앱 로그인과 손쉬운 사용 권한이 필요합니다. Windows 카카오톡은 대화 목록과 메시지 목록을 owner-drawn EVA 컨트롤로 그려서 UI Automation·MSAA 어느 쪽으로도 텍스트를 노출하지 않습니다. 읽을 방법이 없으므로 macOS가 아닌 곳에서는 connector를 등록하지 않습니다. |
 
 텍스트 대화는 전체 내용을 표시합니다. 사진, 영상, 릴스, 게시물, 이모티콘, 공감, 답장, 수정, 삭제와 시스템 안내는 connector와 무관한 공통 메시지 타입으로 정규화하고, 원본 UI에서 확인할 수 있을 때 일관된 텍스트 표식으로 표시합니다. 공유 릴스는 Instagram이 제목을 제공하면 `제목(릴스)`, 제공하지 않으면 `(릴스)`로 표시합니다. 미디어 파일 자체는 다운로드하거나 렌더링하지 않으며, 원본 앱의 보이는 DOM이나 손쉬운 사용 트리에 노출되지 않은 콘텐츠는 생략될 수 있습니다.
 
@@ -181,6 +200,8 @@ npm uninstall --global oh-my-dm
 | `oh-my-dm`을 찾지 못하거나 같은 이름의 폴더로 이동함 | 전역으로 다시 설치하고 새 터미널을 열거나 zsh에서 `rehash`를 실행하세요. `command -v oh-my-dm`으로 확인할 수 있습니다. |
 | npm이 install script를 차단함 | `npm install --global --allow-scripts=oh-my-dm oh-my-dm`으로 다시 설치하세요. 이 script는 Ink를 patch하고 전용 Chromium을 다운로드합니다. |
 | Instagram 로그인이 필요하다고 나오거나 대화방이 나타나지 않음 | `oh-my-dm login instagram`을 다시 실행하세요. 세션이 손상됐다면 `oh-my-dm logout instagram` 후 다시 로그인하세요. |
+| Discord 로그인이 필요하다고 나옴 | `oh-my-dm login discord`를 실행하고 창에서 로그인을 마친 뒤 `Ctrl+C`로 닫으세요. 세션이 손상됐다면 `oh-my-dm logout discord` 후 다시 로그인하세요. |
+| Windows에서 카카오톡 탭이 보이지 않음 | 의도된 동작입니다. Windows 카카오톡은 대화 내용을 접근성 트리에 노출하지 않아 읽을 수 없으므로 connector를 등록하지 않습니다. `oh-my-dm doctor`가 이를 알려줍니다. |
 | Chromium을 찾을 수 없음 | `oh-my-dm doctor`로 확인한 뒤 install script를 허용해 다시 설치하세요. |
 | 카카오톡 연결·대화방 열기·전송이 되지 않음 | 앱 설치와 로그인을 확인하고, oh-my-dm을 실행하는 정확한 터미널 앱에 손쉬운 사용 권한을 부여한 뒤 카카오톡과 터미널을 모두 재시작하세요. |
 | Connector 내용이 갱신되지 않음 | `/refresh`를 실행하세요. Instagram이나 카카오톡 UI가 바뀐 경우에는 oh-my-dm 업데이트가 필요할 수 있습니다. |
@@ -188,7 +209,11 @@ npm uninstall --global oh-my-dm
 
 ### 주의
 
-Instagram DOM selector와 카카오톡 손쉬운 사용 UI 구조는 예고 없이 변경되어 connector가 깨질 수 있습니다. Instagram은 허가받지 않은 자동 데이터 수집도 제한합니다. 개인 실험 용도로 보수적으로 사용하세요. 대량 전송, 자동 재시도와 우회 기능은 의도적으로 포함하지 않습니다.
+Instagram과 Discord의 DOM selector, 카카오톡 손쉬운 사용 UI 구조는 예고 없이 변경되어 connector가 깨질 수 있습니다.
+
+**계정 리스크를 먼저 확인하세요.** Instagram은 허가받지 않은 자동 데이터 수집을 제한합니다. Discord 이용약관은 OAuth2/봇 API 밖에서 사용자 계정을 자동화하는 행위(self-bot)를 금지하며, 적발 시 계정이 종료될 수 있습니다. Discord connector는 공식 봇 API로는 본인 DM을 읽을 수 없고 로컬 RPC에는 전송 명령이 없기 때문에 브라우저 자동화를 사용합니다. 본계정 사용 여부는 직접 판단하세요.
+
+개인 실험 용도로 보수적으로 사용하세요. 대량 전송, 자동 재시도와 우회 기능은 의도적으로 포함하지 않습니다.
 
 ### 기여 및 릴리스
 
@@ -213,6 +238,9 @@ Requires Node.js 22 or later. Run the latest version directly without a global i
 ```bash
 # First-time Instagram login
 npx oh-my-dm@latest login instagram
+
+# First-time Discord login
+npx oh-my-dm@latest login discord
 
 # Launch
 npx oh-my-dm@latest
@@ -247,6 +275,7 @@ After signing in, press `Ctrl+C` to close the login window. KakaoTalk connects t
 - Browse conversations and exchange text messages from the terminal
 - Normalize photos, videos, Reels, posts, stickers, reactions, replies, edits, deletions, and system notices into shared message types
 - See actual sender names in group conversations
+- Browse and send Discord DMs
 - Browse and send KakaoTalk messages on macOS
 - Use one unified conversation list and inspect connections with `/connectors`
 - Receive event-driven updates through DOM and WebSocket wake-up signals
@@ -301,7 +330,8 @@ oh-my-dm logout instagram
 | Connector | Support | Notes |
 | --- | --- | --- |
 | Instagram | macOS and Linux are CI-tested | Uses the bundled Playwright Chromium. Windows is not yet officially verified. |
-| KakaoTalk | macOS only | Requires the desktop KakaoTalk app, an active login, and Accessibility permission. |
+| Discord | macOS, Linux, Windows | Reads and writes DMs on `discord.com/channels/@me` through the bundled Playwright Chromium. Direct messages only; server channels are out of scope. |
+| KakaoTalk | macOS only | Requires the desktop KakaoTalk app, an active login, and Accessibility permission. KakaoTalk for Windows paints its chat list and message list with owner-drawn EVA controls that expose no text through UI Automation or MSAA, so there is nothing to read and the connector is not registered off macOS. |
 
 Text conversations are fully rendered. Photos, videos, Reels, posts, stickers, reactions, replies, edits, deletions, and system notices are normalized into connector-independent message types and shown with consistent text markers when the source UI exposes them. Shared Reels use `title(릴스)` when Instagram provides a title, or `(릴스)` otherwise. Media files themselves are not downloaded or rendered, and content hidden from the source app's visible DOM or accessibility tree may still be omitted.
 
@@ -376,6 +406,8 @@ npm uninstall --global oh-my-dm
 | `oh-my-dm` is not found or opens a same-named directory | Reinstall globally, open a new terminal, or run `rehash` in zsh. Confirm with `command -v oh-my-dm`. |
 | npm blocks the install script | Reinstall with `npm install --global --allow-scripts=oh-my-dm oh-my-dm`. The script patches Ink and downloads the dedicated Chromium. |
 | Instagram asks for login or conversations never appear | Run `oh-my-dm login instagram` again. If the session is corrupted, run `oh-my-dm logout instagram` and log in again. |
+| Discord asks for login | Run `oh-my-dm login discord`, finish signing in, then press `Ctrl+C`. If the session is corrupted, run `oh-my-dm logout discord` and log in again. |
+| The KakaoTalk tab is missing on Windows | Expected. KakaoTalk for Windows does not expose chat content to the accessibility tree, so the connector is not registered. `oh-my-dm doctor` reports this. |
 | Chromium cannot be found | Run `oh-my-dm doctor`, then reinstall with install scripts allowed. |
 | KakaoTalk does not connect, open a room, or send | Confirm the app is installed and signed in, grant Accessibility to the exact terminal app running oh-my-dm, then restart both KakaoTalk and the terminal. |
 | A connector looks stale | Run `/refresh`. Instagram and KakaoTalk UI changes can still require an oh-my-dm update. |
@@ -383,7 +415,11 @@ npm uninstall --global oh-my-dm
 
 ### Important
 
-Instagram DOM selectors and KakaoTalk accessibility UI structures can change without notice and may break the connectors. Instagram also restricts unauthorized automated data collection. Use this project conservatively for personal experimentation. Bulk messaging, automatic retries, and bypass mechanisms are intentionally excluded.
+Instagram and Discord DOM selectors, and KakaoTalk accessibility UI structures, can change without notice and may break the connectors.
+
+**Understand the account risk first.** Instagram restricts unauthorized automated data collection. Discord's Terms of Service prohibit automating a user account outside the OAuth2/bot API (a "self-bot") and violations can end in account termination. The Discord connector uses browser automation because the official bot API cannot read your own DMs and the local RPC protocol has no send command. Decide for yourself whether to point it at your main account.
+
+Use this project conservatively for personal experimentation. Bulk messaging, automatic retries, and bypass mechanisms are intentionally excluded.
 
 ### Contributing and releases
 

@@ -1,10 +1,10 @@
 import { EventEmitter } from "node:events";
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 
 import { chromium, type BrowserContext, type Page } from "playwright-core";
 
+import { cloneBrowserProfile, isProfileLockError } from "../browser/profile.js";
 import { resolveBrowserExecutable } from "../browser/resolve-browser.js";
 import type {
   ChatConnector,
@@ -429,26 +429,14 @@ export interface InstagramWebOptions {
 }
 
 export function isInstagramProfileLockError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return /ProcessSingleton|profile (?:appears to be|is) in use|user data directory is already in use/i.test(message);
+  return isProfileLockError(error);
 }
 
 export async function cloneInstagramProfile(
   sourceProfileDir: string,
-  temporaryRoot = os.tmpdir(),
+  temporaryRoot?: string,
 ): Promise<{ profileDir: string; cleanupDir: string }> {
-  const cleanupDir = await fs.mkdtemp(path.join(temporaryRoot, "oh-my-dm-instagram-"));
-  const profileDir = path.join(cleanupDir, "profile");
-  try {
-    await fs.cp(sourceProfileDir, profileDir, {
-      recursive: true,
-      filter: (source) => !path.basename(source).startsWith("Singleton"),
-    });
-    return { profileDir, cleanupDir };
-  } catch (error) {
-    await fs.rm(cleanupDir, { recursive: true, force: true });
-    throw error;
-  }
+  return cloneBrowserProfile(sourceProfileDir, temporaryRoot, "oh-my-dm-instagram-");
 }
 
 export interface InstagramDirectThreadIdentity {

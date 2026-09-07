@@ -1,16 +1,16 @@
 {
-  "name": "oh-my-dm",
-  "version": "0.7.1",
-  "description": "DM without looking like you're DMing — a discreet Agent CLI-style TUI messenger.",
+  "name": "oh-my-dm-discord",
+  "version": "0.8.0",
+  "description": "Fork of oh-my-dm: a discreet Agent CLI-style TUI messenger, with a Discord DM connector added.",
   "license": "Apache-2.0",
-  "author": "Hyunwoo Gu <162293672+guhyunwoo@users.noreply.github.com>",
-  "homepage": "https://github.com/stacking-money-forever/oh-my-dm#readme",
+  "author": "Hyunwoo Gu <162293672+guhyunwoo@users.noreply.github.com> (original author)",
+  "homepage": "https://github.com/hsK102/oh-my-dm-discord#readme",
   "bugs": {
-    "url": "https://github.com/stacking-money-forever/oh-my-dm/issues"
+    "url": "https://github.com/hsK102/oh-my-dm-discord/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/stacking-money-forever/oh-my-dm.git"
+    "url": "git+https://github.com/hsK102/oh-my-dm-discord.git"
   },
   "keywords": [
     "cli",
@@ -18,14 +18,17 @@
     "instagram",
     "kakaotalk",
     "messaging",
-    "terminal"
+    "terminal",
+    "discord",
+    "fork"
   ],
   "files": [
     "dist",
     "scripts",
     "README.md",
     "LICENSE",
-    "NOTICE"
+    "NOTICE",
+    "CHANGES.md"
   ],
   "type": "module",
   "bin": {
@@ -43,10 +46,6 @@
   "engines": {
     "node": ">=22"
   },
-  "publishConfig": {
-    "access": "public",
-    "provenance": true
-  },
   "dependencies": {
     "ink": "^7.1.1",
     "ink-text-input": "^6.0.0",
@@ -60,5 +59,9 @@
     "@types/react": "^19.2.18",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2"
-  }
+  },
+  "private": true,
+  "contributors": [
+    "hsK102 <325654781+hsK102@users.noreply.github.com>"
+  ]
 }

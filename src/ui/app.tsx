@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Static, Text, useApp, useInput, useStdout } from "ink";
 import stringWidth from "string-width";
 import wrapAnsi from "wrap-ansi";
@@ -65,13 +65,21 @@ interface AppProps {
 }
 
 type ConversationFilter = "all" | "unread";
-type ConversationProvider = "instagram" | "kakaotalk";
+type ConversationProvider = string;
 type ViewMode = "chat" | "history" | "conversations" | "connectors" | "model" | "effort" | "theme" | "language";
 type TranscriptItem =
   | { id: string; kind: "signature"; full: boolean }
   | { id: string; kind: "message"; message: ChatSnapshot["messages"][number] };
 
 const PROJECT_URL = "https://github.com/stacking-money-forever/oh-my-dm";
+
+const CONNECTOR_SOURCES: Record<string, string> = {
+  instagram: "instagram.com/direct · live DOM + WebSocket",
+  discord: "discord.com/channels/@me · live DOM + gateway",
+  kakaotalk: "KakaoTalk for macOS · persistent native bridge",
+};
+
+const FALLBACK_PROVIDER = "instagram";
 
 export function App({
   connector,
@@ -174,7 +182,17 @@ export function App({
   );
   const visibleMessageCount = Math.max(1, mainHeight - 4);
   const messageContentWidth = Math.max(1, terminalSize.columns - 2);
-  const conversationLayout = getConversationLayout(terminalSize.columns);
+  const providerTabs = useMemo(
+    () =>
+      snapshot.connectors?.length
+        ? snapshot.connectors.map((item) => ({ id: item.id, label: item.label }))
+        : [{ id: FALLBACK_PROVIDER, label: "Instagram" }],
+    [snapshot.connectors],
+  );
+  const conversationLayout = getConversationLayout(
+    terminalSize.columns,
+    providerTabs.map((item) => item.label),
+  );
   const conversationContentWidth = conversationLayout.contentWidth;
   const transcriptRows = useMemo(
     () =>
@@ -655,9 +673,12 @@ export function App({
       viewMode === "conversations" &&
       (key.tab || key.leftArrow || key.rightArrow)
     ) {
-      setConversationProvider((provider) =>
-        provider === "instagram" ? "kakaotalk" : "instagram",
-      );
+      setConversationProvider((current) => {
+        const index = providerTabs.findIndex((item) => item.id === current);
+        const step = key.leftArrow ? -1 : 1;
+        const next = (index + step + providerTabs.length) % providerTabs.length;
+        return providerTabs[next]?.id ?? current;
+      });
       setSelectedIndex(0);
       return;
     }
@@ -812,7 +833,7 @@ export function App({
       case "conversations":
         await connector.refresh();
         setConversationFilter("all");
-        setConversationProvider("instagram");
+        setConversationProvider(providerTabs[0]?.id ?? FALLBACK_PROVIDER);
         setViewMode("conversations");
         setSelectedIndex(0);
         setNotice(copy.conversationsNotice);
@@ -1111,35 +1132,33 @@ export function App({
                 </Box>
               )}
               <Box width={conversationTabsWidth} flexShrink={0} justifyContent="flex-end">
-                <Text
-                  bold={conversationProvider === "instagram"}
-                  color={conversationProvider === "instagram" ? "#000000" : theme.muted}
-                  backgroundColor={
-                    conversationProvider === "instagram"
-                      ? CONNECTOR_COLORS.instagram
-                      : undefined
-                  }
-                >
-                  {useCompactConversationTabs ? " I " : " Instagram "}
-                </Text>
-                <Text color={theme.muted}> │ </Text>
-                <Text
-                  bold={conversationProvider === "kakaotalk"}
-                  color={conversationProvider === "kakaotalk" ? "#000000" : theme.muted}
-                  backgroundColor={
-                    conversationProvider === "kakaotalk"
-                      ? CONNECTOR_COLORS.kakaotalk
-                      : undefined
-                  }
-                >
-                  {useCompactConversationTabs ? " K " : " KakaoTalk "}
-                </Text>
+                {providerTabs.map((tab, index) => {
+                  const selected = conversationProvider === tab.id;
+                  return (
+                    <Fragment key={tab.id}>
+                      {index > 0 && <Text color={theme.muted}> │ </Text>}
+                      <Text
+                        bold={selected}
+                        color={selected ? "#000000" : theme.muted}
+                        backgroundColor={selected ? CONNECTOR_COLORS[tab.id] : undefined}
+                      >
+                        {useCompactConversationTabs
+                          ? ` ${providerMark(tab.label)} `
+                          : ` ${tab.label} `}
+                      </Text>
+                    </Fragment>
+                  );
+                })}
               </Box>
             </Box>
             {conversations.length === 0 ? (
               <Text color={theme.muted}>
-                {conversationProvider === "instagram" && conversationConnector?.state === "login-required"
-                  ? copy.instagramLoginRequired
+                {conversationConnector?.state === "login-required"
+                  ? copy.providerLoginRequired(
+                      providerTabs.find((tab) => tab.id === conversationProvider)?.label ??
+                        conversationProvider,
+                      conversationProvider,
+                    )
                   : conversationFilter === "unread"
                   ? copy.noUnread
                   : copy.waitingConversations}
@@ -1150,11 +1169,11 @@ export function App({
                 const selected = absoluteIndex === selectedIndex;
                 const selectionMark = selected ? "> " : "  ";
                 const unreadMark = conversation.unread ? " ●" : "  ";
-                const isKakaoTalk = conversation.provider === "kakaotalk";
-                const providerMark = isKakaoTalk ? "K" : "I";
-                const providerColor = isKakaoTalk
-                  ? CONNECTOR_COLORS.kakaotalk
-                  : CONNECTOR_COLORS.instagram;
+                const rowProvider = conversation.provider ?? FALLBACK_PROVIDER;
+                const rowLabel =
+                  providerTabs.find((tab) => tab.id === rowProvider)?.label ?? rowProvider;
+                const rowMark = providerMark(rowLabel);
+                const providerColor = CONNECTOR_COLORS[rowProvider] ?? theme.muted;
                 const titleCellWidth = Math.max(1, conversationTitleWidth - 1);
                 const title = truncateToWidth(
                   conversation.title,
@@ -1175,7 +1194,7 @@ export function App({
                       </Text>
                     </Box>
                     <Box width={1} flexShrink={0}>
-                      <Text color={providerColor}>{providerMark}</Text>
+                      <Text color={providerColor}>{rowMark}</Text>
                     </Box>
                     <Box width={2} flexShrink={0}>
                       <Text color={conversation.unread ? theme.accent : undefined}>
@@ -1202,7 +1221,7 @@ export function App({
             <Box marginTop={1} flexDirection="column">
               <Text color={theme.muted}>{copy.chatConnectors}</Text>
               {(snapshot.connectors ?? [
-                { id: "instagram", label: "Instagram", state: snapshot.state, detail: snapshot.detail },
+                { id: FALLBACK_PROVIDER, label: "Instagram", state: snapshot.state, detail: snapshot.detail },
               ]).map((connectorStatus, index) => (
                 <Box key={connectorStatus.id} flexDirection="column" marginTop={index === 0 ? 0 : 1}>
                   <Text>
@@ -1215,7 +1234,7 @@ export function App({
                   </Text>
                   <Box marginLeft={3} flexDirection="column">
                     <Text color={theme.muted}>
-                      source      {connectorStatus.id === "instagram" ? "instagram.com/direct · live DOM + WebSocket" : "KakaoTalk for macOS · persistent native bridge"}
+                      source      {CONNECTOR_SOURCES[connectorStatus.id] ?? connectorStatus.label}
                     </Text>
                     <Text color={theme.muted}>storage     {copy.storage}</Text>
                     {connectorStatus.detail && <Text color={theme.muted}>detail      {connectorStatus.detail}</Text>}
@@ -1444,4 +1463,9 @@ function useTerminalSize(stdout: NodeJS.WriteStream): { rows: number; columns: n
   }, [stdout]);
 
   return size;
+}
+
+/** Connector tabs collapse to one glyph on narrow terminals. */
+function providerMark(label: string): string {
+  return (label.trim()[0] ?? "?").toUpperCase();
 }

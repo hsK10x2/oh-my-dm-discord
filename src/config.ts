@@ -4,7 +4,9 @@ import path from "node:path";
 
 export interface AppPaths {
   dataDir: string;
+  /** Instagram browser profile. Named without a provider for backwards compatibility. */
   browserProfileDir: string;
+  discordProfileDir: string;
   settingsFile: string;
 }
 
@@ -21,6 +23,7 @@ export function getAppPaths(env: NodeJS.ProcessEnv = process.env): AppPaths {
   return {
     dataDir,
     browserProfileDir: path.join(dataDir, "browser", "instagram"),
+    discordProfileDir: path.join(dataDir, "browser", "discord"),
     settingsFile: path.join(dataDir, "settings.json"),
   };
 }

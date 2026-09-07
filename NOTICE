@@ -2,3 +2,20 @@ oh-my-dm
 Copyright 2026 Hyunwoo Gu
 
 This product is licensed under the Apache License, Version 2.0.
+
+--------------------------------------------------------------------------
+
+This distribution is a modified version of the original work.
+
+Original work: https://github.com/stacking-money-forever/oh-my-dm
+Original author: Hyunwoo Gu (Copyright 2026)
+
+Modifications (2026) by the maintainer of this fork:
+  - Added src/connectors/discord-dom.ts and src/connectors/discord-web.ts
+  - Added src/browser/profile.ts (extracted from src/connectors/instagram-web.ts)
+  - Modified src/cli.tsx, src/config.ts, src/connectors/instagram-web.ts,
+    src/ui/app.tsx, src/ui/i18n.ts, src/ui/text-layout.ts, src/ui/theme.ts
+  - Added test/discord-dom.test.ts and test/discord-web.test.ts
+
+The modifications are released under the same Apache License, Version 2.0.
+
