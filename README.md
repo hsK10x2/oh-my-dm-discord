@@ -41,6 +41,45 @@ oh-my-dm은 Agent CLI처럼 보이도록 만든 눈치 덜 보이는 TUI 메신�
 
 핵심 목적은 회사, 교실 또는 사람이 함께 있는 공간에서 익숙한 메신저 창으로 시선을 끌지 않고 조금 더 사적으로 DM을 확인하고 보내는 것입니다. 터미널 작업 흐름을 유지하는 것은 추가 장점입니다. 별도 애플리케이션 백엔드나 메시지 저장소는 없으며, 로컬 connector가 원본 서비스의 데이터를 읽어 하나의 Agent 스타일 workspace에 표시합니다.
 
+### 한눈에 보기 (TL;DR)
+
+**설치**
+
+```bash
+npm install --global oh-my-dm-discord
+```
+
+**최초 로그인** (각각 브라우저 창이 뜹니다. 로그인 후 `Ctrl+C`로 창을 닫으세요)
+
+```bash
+dm login instagram
+dm login discord
+```
+
+**실행**
+
+```bash
+dm
+```
+
+**자주 쓰는 명령**
+
+| 하고 싶은 것 | 키 |
+| --- | --- |
+| 대화 목록 열기 | `/conversations` |
+| Instagram ↔ Discord ↔ KakaoTalk 전환 | `Tab` 또는 `←`/`→` |
+| 방 선택 / 열기 | `↑`/`↓` 로 고르고 `Enter` |
+| 메시지 보내기 | 타이핑 후 `Enter` |
+| 이전 메시지 더 보기 | 입력창 비운 채로 `↑` 또는 `PageUp` |
+| 커넥터 상태 확인 | `/connectors` |
+| 새로고침 | `/refresh` |
+| 종료 | `Esc` 또는 `Ctrl+C` |
+
+> [!IMPORTANT]
+> **설치·업데이트하기 전엔 `dm`을 완전히 종료하세요.** 실행 중(또는 창을 닫았지만 아직 백그라운드에
+> 남아있는 headless Chromium 프로세스 포함)이면 Chromium 파일이 잠겨 설치가 깨집니다. 자세한 내용은
+> 아래 문제 해결 표를 참고하세요.
+
 ### 빠른 시작
 
 Node.js 22 이상이 필요합니다. 설치 없이 최신 버전을 바로 실행할 수 있습니다.
@@ -217,7 +256,7 @@ npm uninstall --global oh-my-dm-discord
 | Instagram 로그인이 필요하다고 나오거나 대화방이 나타나지 않음 | `oh-my-dm login instagram`을 다시 실행하세요. 세션이 손상됐다면 `oh-my-dm logout instagram` 후 다시 로그인하세요. |
 | Discord 로그인이 필요하다고 나옴 | `oh-my-dm login discord`를 실행하고 창에서 로그인을 마친 뒤 `Ctrl+C`로 닫으세요. 세션이 손상됐다면 `oh-my-dm logout discord` 후 다시 로그인하세요. |
 | Windows에서 카카오톡 탭이 보이지 않음 | 의도된 동작입니다. Windows 카카오톡은 대화 내용을 접근성 트리에 노출하지 않아 읽을 수 없으므로 connector를 등록하지 않습니다. `oh-my-dm doctor`가 이를 알려줍니다. |
-| 설치·업데이트가 `EBUSY`로 실패함 (Windows) | oh-my-dm이 실행 중이면 Chromium 파일이 잠겨 설치가 깨집니다. TUI와 로그인 창을 모두 종료한 뒤 다시 시도하세요. |
+| 설치·업데이트가 `EBUSY`로 실패함 (Windows) | oh-my-dm이 실행 중이면 Chromium 파일이 잠겨 설치가 깨집니다. TUI와 로그인 창을 모두 종료한 뒤 다시 시도하세요. 창을 닫아도 계속 실패하면 작업 관리자에서 `ms-playwright` 경로의 `chrome.exe`가 남아있는지 확인하고 모두 종료하세요 — 창이 닫혀도 headless 프로세스가 백그라운드에 남을 수 있습니다. |
 | 이미 `oh-my-dm`이 설치돼 있음 | 이 포크도 `dm`과 `oh-my-dm` 명령을 제공하므로 원본 패키지의 명령을 덮어씁니다. 둘을 함께 쓰려면 원본을 먼저 제거하세요. |
 | Chromium을 찾을 수 없음 | `oh-my-dm doctor`로 확인한 뒤 install script를 허용해 다시 설치하세요. |
 | 카카오톡 연결·대화방 열기·전송이 되지 않음 | 앱 설치와 로그인을 확인하고, oh-my-dm을 실행하는 정확한 터미널 앱에 손쉬운 사용 권한을 부여한 뒤 카카오톡과 터미널을 모두 재시작하세요. |
@@ -247,6 +286,45 @@ Pull request를 열기 전에 [CONTRIBUTING.md](CONTRIBUTING.md)를 읽어주세
 oh-my-dm is a discreet TUI messenger styled to look like an Agent CLI. It brings Instagram and KakaoTalk into an interface inspired by tools such as Codex CLI, Claude Code, and OpenCode, making casual screen glances look more like coding-agent work than an open chat app.
 
 The main goal is simple: let you check and send DMs more privately in shared offices, classrooms, or other places where a familiar messenger window would immediately draw attention. Staying inside your terminal workflow is an additional benefit. There is no application backend or message archive; local connectors read from the original services and present everything through one agent-style workspace.
+
+### TL;DR
+
+**Install**
+
+```bash
+npm install --global oh-my-dm-discord
+```
+
+**First-time login** (each opens a browser window — press `Ctrl+C` to close it once you're signed in)
+
+```bash
+dm login instagram
+dm login discord
+```
+
+**Launch**
+
+```bash
+dm
+```
+
+**Common commands**
+
+| Action | Keys |
+| --- | --- |
+| Open the conversation list | `/conversations` |
+| Switch Instagram ↔ Discord ↔ KakaoTalk | `Tab` or `←`/`→` |
+| Select / open a room | `↑`/`↓` then `Enter` |
+| Send a message | Type, then `Enter` |
+| Load older messages | `↑` or `PageUp` with an empty composer |
+| Check connector status | `/connectors` |
+| Refresh | `/refresh` |
+| Quit | `Esc` or `Ctrl+C` |
+
+> [!IMPORTANT]
+> **Fully quit `dm` before installing or updating.** A running instance — including a headless
+> Chromium process still alive in the background after you closed the window — locks Chromium's
+> files and breaks the install. See the troubleshooting table below for details.
 
 ### Quick start
 
@@ -425,7 +503,7 @@ npm uninstall --global oh-my-dm-discord
 | Instagram asks for login or conversations never appear | Run `oh-my-dm login instagram` again. If the session is corrupted, run `oh-my-dm logout instagram` and log in again. |
 | Discord asks for login | Run `oh-my-dm login discord`, finish signing in, then press `Ctrl+C`. If the session is corrupted, run `oh-my-dm logout discord` and log in again. |
 | The KakaoTalk tab is missing on Windows | Expected. KakaoTalk for Windows does not expose chat content to the accessibility tree, so the connector is not registered. `oh-my-dm doctor` reports this. |
-| Install or update fails with `EBUSY` (Windows) | A running oh-my-dm locks the Chromium files. Quit the TUI and any login window, then retry. |
+| Install or update fails with `EBUSY` (Windows) | A running oh-my-dm locks the Chromium files. Quit the TUI and any login window, then retry. If it still fails, check Task Manager for any `chrome.exe` under an `ms-playwright` path and end them — a headless process can outlive the window you closed. |
 | `oh-my-dm` is already installed | This fork also provides the `dm` and `oh-my-dm` commands, so it replaces the original package's commands. Uninstall the original first if you want both. |
 | Chromium cannot be found | Run `oh-my-dm doctor`, then reinstall with install scripts allowed. |
 | KakaoTalk does not connect, open a room, or send | Confirm the app is installed and signed in, grant Accessibility to the exact terminal app running oh-my-dm, then restart both KakaoTalk and the terminal. |
