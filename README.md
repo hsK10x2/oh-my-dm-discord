@@ -41,22 +41,22 @@ oh-my-dm은 Agent CLI처럼 보이도록 만든 눈치 덜 보이는 TUI 메신�
 
 핵심 목적은 회사, 교실 또는 사람이 함께 있는 공간에서 익숙한 메신저 창으로 시선을 끌지 않고 조금 더 사적으로 DM을 확인하고 보내는 것입니다. 터미널 작업 흐름을 유지하는 것은 추가 장점입니다. 별도 애플리케이션 백엔드나 메시지 저장소는 없으며, 로컬 connector가 원본 서비스의 데이터를 읽어 하나의 Agent 스타일 workspace에 표시합니다.
 
-### 한눈에 보기 (TL;DR)
+### 설치방법
 
-**설치**
+**install 설치**
 
 ```bash
 npm install --global oh-my-dm-discord
 ```
 
-**최초 로그인** (각각 브라우저 창이 뜹니다. 로그인 후 `Ctrl+C`로 창을 닫으세요)
+**login 최초 로그인** (각각 브라우저 창이 뜹니다. 로그인 후 창을 닫으세요)
 
 ```bash
 dm login instagram
 dm login discord
 ```
 
-**실행**
+**run 실행**
 
 ```bash
 dm
