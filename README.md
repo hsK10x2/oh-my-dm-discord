@@ -14,6 +14,21 @@
 > - Fixed a crash where a refresh scheduled before teardown raised an unhandled
 >   `error` event and killed `oh-my-dm login`
 
+> [!WARNING]
+> **읽고 쓰는 계정이 정지될 수 있습니다 / This can get your account banned.**
+> Discord의 이용약관은 OAuth2/봇 API 밖에서 사용자 계정을 자동화하는 행위(self-bot)를
+> 금지하며, 적발 시 계정이 영구 종료될 수 있습니다. 이 도구의 Discord 커넥터가 정확히
+> 그 방식입니다 — 공식 봇 API로는 본인 DM을 읽을 수 없고 로컬 RPC에는 전송 명령이
+> 없기 때문입니다. Instagram 역시 허가받지 않은 자동 수집을 제한합니다.
+> **본계정 대신 부계정 사용을 권장하며, 사용에 따른 책임은 사용자 본인에게 있습니다.**
+>
+> Discord's Terms of Service prohibit automating a user account outside the
+> OAuth2/bot API (a "self-bot") and violations can end in permanent account
+> termination. This tool's Discord connector is exactly that, because the
+> official bot API cannot read your own DMs and the local RPC protocol has no
+> send command. Instagram likewise restricts unauthorized automated collection.
+> **Prefer a secondary account. You use this at your own risk.**
+
 ![oh-my-dm terminal interface](docs/screenshot.png)
 
 [한국어](#한국어) · [English](#english)
@@ -32,13 +47,13 @@ Node.js 22 이상이 필요합니다. 설치 없이 최신 버전을 바로 실�
 
 ```bash
 # Instagram 최초 로그인
-npx oh-my-dm@latest login instagram
+npx oh-my-dm-discord@latest login instagram
 
 # Discord 최초 로그인
-npx oh-my-dm@latest login discord
+npx oh-my-dm-discord@latest login discord
 
 # 실행
-npx oh-my-dm@latest
+npx oh-my-dm-discord@latest
 ```
 
 로그인을 마치면 `Ctrl+C`로 로그인 창을 닫으세요. 카카오톡은 별도 로그인 없이 실행 중인 macOS 앱에 연결됩니다.
@@ -88,7 +103,7 @@ oh-my-dm은 Instagram 내부 WebSocket이나 MQTT payload를 해석하지 않습
 Node.js 22 이상이 필요합니다. Instagram connector는 전용 Playwright Chromium을 설치해 사용하므로 기본 브라우저가 Safari, Chrome, Brave 또는 다른 브라우저여도 동일하게 작동합니다. 카카오톡은 macOS용 앱이 설치되어 있고 로그인되어 있어야 합니다.
 
 ```bash
-npm install --global oh-my-dm
+npm install --global oh-my-dm-discord
 oh-my-dm login instagram
 oh-my-dm
 ```
@@ -96,7 +111,7 @@ oh-my-dm
 npm이 `oh-my-dm` 설치 스크립트를 차단했다고 표시하면, 전용 Chromium을 내려받을 수 있도록 스크립트를 허용해 다시 설치하세요.
 
 ```bash
-npm install --global --allow-scripts=oh-my-dm oh-my-dm
+npm install --global --allow-scripts=oh-my-dm-discord oh-my-dm-discord
 ```
 
 짧은 별칭인 `dm`도 함께 설치되므로 어느 경로에서든 `dm` 또는 `oh-my-dm`으로 같은 TUI를 실행할 수 있습니다.
@@ -190,7 +205,7 @@ CLI를 제거하려면 필요에 따라 Instagram 세션을 먼저 삭제한 뒤
 
 ```bash
 oh-my-dm logout instagram
-npm uninstall --global oh-my-dm
+npm uninstall --global oh-my-dm-discord
 ```
 
 ### 문제 해결
@@ -198,10 +213,12 @@ npm uninstall --global oh-my-dm
 | 증상 | 해결 방법 |
 | --- | --- |
 | `oh-my-dm`을 찾지 못하거나 같은 이름의 폴더로 이동함 | 전역으로 다시 설치하고 새 터미널을 열거나 zsh에서 `rehash`를 실행하세요. `command -v oh-my-dm`으로 확인할 수 있습니다. |
-| npm이 install script를 차단함 | `npm install --global --allow-scripts=oh-my-dm oh-my-dm`으로 다시 설치하세요. 이 script는 Ink를 patch하고 전용 Chromium을 다운로드합니다. |
+| npm이 install script를 차단함 | `npm install --global --allow-scripts=oh-my-dm-discord oh-my-dm-discord`으로 다시 설치하세요. 이 script는 Ink를 patch하고 전용 Chromium을 다운로드합니다. |
 | Instagram 로그인이 필요하다고 나오거나 대화방이 나타나지 않음 | `oh-my-dm login instagram`을 다시 실행하세요. 세션이 손상됐다면 `oh-my-dm logout instagram` 후 다시 로그인하세요. |
 | Discord 로그인이 필요하다고 나옴 | `oh-my-dm login discord`를 실행하고 창에서 로그인을 마친 뒤 `Ctrl+C`로 닫으세요. 세션이 손상됐다면 `oh-my-dm logout discord` 후 다시 로그인하세요. |
 | Windows에서 카카오톡 탭이 보이지 않음 | 의도된 동작입니다. Windows 카카오톡은 대화 내용을 접근성 트리에 노출하지 않아 읽을 수 없으므로 connector를 등록하지 않습니다. `oh-my-dm doctor`가 이를 알려줍니다. |
+| 설치·업데이트가 `EBUSY`로 실패함 (Windows) | oh-my-dm이 실행 중이면 Chromium 파일이 잠겨 설치가 깨집니다. TUI와 로그인 창을 모두 종료한 뒤 다시 시도하세요. |
+| 이미 `oh-my-dm`이 설치돼 있음 | 이 포크도 `dm`과 `oh-my-dm` 명령을 제공하므로 원본 패키지의 명령을 덮어씁니다. 둘을 함께 쓰려면 원본을 먼저 제거하세요. |
 | Chromium을 찾을 수 없음 | `oh-my-dm doctor`로 확인한 뒤 install script를 허용해 다시 설치하세요. |
 | 카카오톡 연결·대화방 열기·전송이 되지 않음 | 앱 설치와 로그인을 확인하고, oh-my-dm을 실행하는 정확한 터미널 앱에 손쉬운 사용 권한을 부여한 뒤 카카오톡과 터미널을 모두 재시작하세요. |
 | Connector 내용이 갱신되지 않음 | `/refresh`를 실행하세요. Instagram이나 카카오톡 UI가 바뀐 경우에는 oh-my-dm 업데이트가 필요할 수 있습니다. |
@@ -237,13 +254,13 @@ Requires Node.js 22 or later. Run the latest version directly without a global i
 
 ```bash
 # First-time Instagram login
-npx oh-my-dm@latest login instagram
+npx oh-my-dm-discord@latest login instagram
 
 # First-time Discord login
-npx oh-my-dm@latest login discord
+npx oh-my-dm-discord@latest login discord
 
 # Launch
-npx oh-my-dm@latest
+npx oh-my-dm-discord@latest
 ```
 
 After signing in, press `Ctrl+C` to close the login window. KakaoTalk connects to the running macOS app without a separate oh-my-dm login.
@@ -294,7 +311,7 @@ oh-my-dm does not decode Instagram's internal WebSocket or MQTT payloads. Incomi
 Node.js 22 or later is required. The Instagram connector installs and uses its own Playwright Chromium, so it works independently of whether your default browser is Safari, Chrome, Brave, or another browser. KakaoTalk additionally requires macOS with KakaoTalk installed and signed in.
 
 ```bash
-npm install --global oh-my-dm
+npm install --global oh-my-dm-discord
 oh-my-dm login instagram
 oh-my-dm
 ```
@@ -302,7 +319,7 @@ oh-my-dm
 If npm reports that the `oh-my-dm` install script was blocked, allow it and reinstall so the dedicated Chromium can be downloaded:
 
 ```bash
-npm install --global --allow-scripts=oh-my-dm oh-my-dm
+npm install --global --allow-scripts=oh-my-dm-discord oh-my-dm-discord
 ```
 
 `dm` is installed as a shorter alias, so you can launch the same TUI from any directory with either `dm` or `oh-my-dm`.
@@ -396,7 +413,7 @@ To remove the CLI, optionally delete its Instagram session first and then uninst
 
 ```bash
 oh-my-dm logout instagram
-npm uninstall --global oh-my-dm
+npm uninstall --global oh-my-dm-discord
 ```
 
 ### Troubleshooting
@@ -404,10 +421,12 @@ npm uninstall --global oh-my-dm
 | Symptom | What to do |
 | --- | --- |
 | `oh-my-dm` is not found or opens a same-named directory | Reinstall globally, open a new terminal, or run `rehash` in zsh. Confirm with `command -v oh-my-dm`. |
-| npm blocks the install script | Reinstall with `npm install --global --allow-scripts=oh-my-dm oh-my-dm`. The script patches Ink and downloads the dedicated Chromium. |
+| npm blocks the install script | Reinstall with `npm install --global --allow-scripts=oh-my-dm-discord oh-my-dm-discord`. The script patches Ink and downloads the dedicated Chromium. |
 | Instagram asks for login or conversations never appear | Run `oh-my-dm login instagram` again. If the session is corrupted, run `oh-my-dm logout instagram` and log in again. |
 | Discord asks for login | Run `oh-my-dm login discord`, finish signing in, then press `Ctrl+C`. If the session is corrupted, run `oh-my-dm logout discord` and log in again. |
 | The KakaoTalk tab is missing on Windows | Expected. KakaoTalk for Windows does not expose chat content to the accessibility tree, so the connector is not registered. `oh-my-dm doctor` reports this. |
+| Install or update fails with `EBUSY` (Windows) | A running oh-my-dm locks the Chromium files. Quit the TUI and any login window, then retry. |
+| `oh-my-dm` is already installed | This fork also provides the `dm` and `oh-my-dm` commands, so it replaces the original package's commands. Uninstall the original first if you want both. |
 | Chromium cannot be found | Run `oh-my-dm doctor`, then reinstall with install scripts allowed. |
 | KakaoTalk does not connect, open a room, or send | Confirm the app is installed and signed in, grant Accessibility to the exact terminal app running oh-my-dm, then restart both KakaoTalk and the terminal. |
 | A connector looks stale | Run `/refresh`. Instagram and KakaoTalk UI changes can still require an oh-my-dm update. |

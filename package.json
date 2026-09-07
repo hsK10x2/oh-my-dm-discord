@@ -33,11 +33,13 @@
   "type": "module",
   "bin": {
     "dm": "dist/cli.js",
-    "oh-my-dm": "dist/cli.js"
+    "oh-my-dm": "dist/cli.js",
+    "oh-my-dm-discord": "dist/cli.js"
   },
   "scripts": {
     "clean": "node -e \"require('node:fs').rmSync('dist', {recursive:true, force:true})\"",
     "build": "npm run clean && tsc -p tsconfig.build.json",
+    "prepare": "npm run build",
     "dev": "node --import tsx src/cli.tsx",
     "postinstall": "node scripts/patch-ink-static-fullscreen.mjs && playwright-core install chromium --no-shell",
     "typecheck": "tsc --noEmit",
@@ -60,8 +62,10 @@
     "tsx": "^4.23.13",
     "typescript": "^7.0.2"
   },
-  "private": true,
   "contributors": [
     "hsK102 <325654781+hsK102@users.noreply.github.com>"
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }
