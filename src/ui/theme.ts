@@ -18,6 +18,7 @@ export interface UiTheme {
 export const CONNECTOR_COLORS: Record<string, string> = {
   instagram: "#E1306C",
   discord: "#5865F2",
+  "discord-servers": "#7289DA",
   kakaotalk: "#FEE500",
 };
 

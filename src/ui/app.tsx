@@ -10,6 +10,7 @@ import { getMessageWindow, getOlderMessageOffset } from "./message-window.js";
 import {
   filterSlashCommands,
   findSlashCommand,
+  getGroupedSelectionWindow,
   getSelectionWindow,
   getSlashCommands,
   parseSubmission,
@@ -257,9 +258,17 @@ export function App({
   );
   const conversationWindow = useMemo(
     // The fixed-height box spends two rows on its border and one on the
-    // provider/path header. Rendering one extra conversation makes Yoga
-    // collapse an arbitrary row to height 0, leaving it selectable but hidden.
-    () => getSelectionWindow(conversations, selectedIndex, Math.max(1, mainHeight - 3)),
+    // provider/path header. Rendering one extra line makes Yoga collapse an
+    // arbitrary row to height 0, leaving it selectable but hidden — and a
+    // section heading is an extra line, so rows and headings are budgeted
+    // together rather than counting rows alone.
+    () =>
+      getGroupedSelectionWindow(
+        conversations,
+        selectedIndex,
+        Math.max(1, mainHeight - 3),
+        (conversation) => conversation.group,
+      ),
     [conversations, mainHeight, selectedIndex],
   );
   const modelWindow = useMemo(

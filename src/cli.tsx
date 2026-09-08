@@ -6,6 +6,7 @@ import React from "react";
 
 import { resolveBrowserExecutable } from "./browser/resolve-browser.js";
 import { getAppPaths } from "./config.js";
+import { DiscordViewConnector } from "./connectors/discord-view.js";
 import { DiscordWebConnector } from "./connectors/discord-web.js";
 import { InstagramWebConnector } from "./connectors/instagram-web.js";
 import { KakaoNativeConnector } from "./connectors/kakao-native.js";
@@ -95,9 +96,21 @@ if (!(provider in browserProviders) && command !== "chat") {
     headless,
     cloneProfileWhenLocked: true,
   });
+  // One Discord session, shown as two tabs. A busy account has a couple of
+  // hundred server channels, and mixing them into the direct-message list
+  // makes both hard to move around in.
   const connector = new UnifiedChatConnector([
     { id: "instagram", label: "Instagram", connector: instagram },
-    { id: "discord", label: "Discord", connector: discord },
+    {
+      id: "discord",
+      label: "Discord DM",
+      connector: new DiscordViewConnector(discord, "dm"),
+    },
+    {
+      id: "discord-servers",
+      label: "Discord 서버",
+      connector: new DiscordViewConnector(discord, "guild"),
+    },
     ...(kakaoSupported
       ? [{ id: "kakaotalk", label: "KakaoTalk", connector: new KakaoNativeConnector() }]
       : []),

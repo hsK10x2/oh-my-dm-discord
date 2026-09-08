@@ -94,6 +94,55 @@ export interface SelectionWindow<T> {
   end: number;
 }
 
+/**
+ * Picks the slice of a grouped list that fits in `availableLines`.
+ *
+ * A row costs one line, and a row that opens a new section costs two: the
+ * heading sits above it. Sizing the window by row count alone overflows the
+ * fixed-height box by exactly the number of headings on screen, and Ink
+ * responds by collapsing an arbitrary row to zero height — selectable but
+ * invisible.
+ */
+export function getGroupedSelectionWindow<T>(
+  items: T[],
+  selectedIndex: number,
+  availableLines: number,
+  groupOf: (item: T) => string | undefined,
+): SelectionWindow<T> {
+  const lines = Math.max(1, availableLines);
+  const costAt = (index: number): number => {
+    const group = groupOf(items[index]!);
+    if (!group) return 1;
+    // The first row always opens its section.
+    if (index === 0) return 2;
+    return groupOf(items[index - 1]!) === group ? 1 : 2;
+  };
+
+  // Grow backwards from the selection so it stays visible, then forwards
+  // with whatever room is left.
+  const anchor = Math.min(Math.max(0, selectedIndex), Math.max(0, items.length - 1));
+  if (items.length === 0) return { items: [], start: 0, end: 0 };
+
+  let start = anchor;
+  let end = anchor + 1;
+  let used = costAt(anchor);
+  for (;;) {
+    let grew = false;
+    if (start > 0 && used + costAt(start - 1) <= lines) {
+      start -= 1;
+      used += costAt(start);
+      grew = true;
+    }
+    if (end < items.length && used + costAt(end) <= lines) {
+      used += costAt(end);
+      end += 1;
+      grew = true;
+    }
+    if (!grew) break;
+  }
+  return { items: items.slice(start, end), start, end };
+}
+
 export function getSelectionWindow<T>(
   items: T[],
   selectedIndex: number,
