@@ -26,6 +26,7 @@ const kakaoSupported = process.platform === "darwin";
 const browserProviders: Record<string, string> = {
   instagram: paths.browserProfileDir,
   discord: paths.discordProfileDir,
+  "discord-servers": paths.discordProfileDir,
 };
 
 await removeLegacySnapshot(paths.dataDir);
@@ -140,7 +141,7 @@ if (!(provider in browserProviders) && command !== "chat") {
 } else if (command === "login") {
   console.log(cliText.login);
   const profileDir = browserProviders[provider]!;
-  const connector = provider === "discord"
+  const connector = (provider === "discord" || provider === "discord-servers")
     ? new DiscordWebConnector({ profileDir, headless: false })
     : new InstagramWebConnector({ profileDir, headless: false });
   // EventEmitter turns an 'error' with no listener into a process crash,
