@@ -21,6 +21,13 @@ export interface RawDiscordConversation {
   preview?: string;
   unreadHint?: boolean;
   /**
+   * The row Discord is currently showing. It is drawn at full contrast
+   * because it is selected, which is indistinguishable from unread by colour
+   * alone — and harvesting opens a server's first channel, so without this
+   * every server reported a false unread on its first row.
+   */
+  active?: boolean;
+  /**
    * Computed colour of the row's name. Discord signals unread by rendering
    * the name at full contrast and read rows dimmed, and exposes that
    * nowhere else — no class, no attribute. See markUnreadByContrast.
@@ -71,10 +78,11 @@ export function markUnreadByContrast<T extends {
   nameColor?: string;
   backgroundColor?: string;
   unreadHint?: boolean;
+  active?: boolean;
 }>(rows: T[]): T[] {
   const counts = new Map<string, number>();
   for (const row of rows) {
-    if (!row.nameColor) continue;
+    if (!row.nameColor || row.active) continue;
     counts.set(row.nameColor, (counts.get(row.nameColor) ?? 0) + 1);
   }
   let readColor: string | undefined;
@@ -95,6 +103,8 @@ export function markUnreadByContrast<T extends {
 
   return rows.map((row) => {
     if (row.unreadHint) return row;
+    // The selected row is bright because it is selected.
+    if (row.active) return row;
     if (!row.nameColor || row.nameColor === readColor) return row;
     const luminance = approximateLuminance(row.nameColor);
     if (luminance === undefined) return row;
@@ -129,7 +139,7 @@ export function normalizeDiscordConversation(
 ): Conversation | undefined {
   const id = channelIdFromHref(raw.href);
   if (!id) return undefined;
-  const title = collapseWhitespace(raw.title);
+  const { name: title, unread: unreadFromLabel } = readUnreadLabel(raw.title);
   if (!title) return undefined;
   const preview = collapseWhitespace(raw.preview ?? "");
   return {
@@ -137,7 +147,7 @@ export function normalizeDiscordConversation(
     href: raw.href,
     title,
     ...(preview ? { preview } : {}),
-    unread: Boolean(raw.unreadHint),
+    unread: unreadFromLabel || Boolean(raw.unreadHint),
     group: "다이렉트 메시지",
   };
 }
@@ -170,6 +180,26 @@ export function channelHrefParts(href: string): { guildId?: string; channelId?: 
  * which is the only place the bare name appears — the row's text content also
  * carries the hover actions ("채널 편집" and friends).
  */
+/**
+ * Discord prefixes an unread row's accessible name with a localized marker —
+ * "읽지 않은 <name>", "unread, <name>" — which is a far better signal than
+ * guessing from how brightly the row is drawn. Returns the bare name and
+ * whether the marker was there.
+ */
+export function readUnreadLabel(label: string): { name: string; unread: boolean } {
+  const text = collapseWhitespace(label);
+  const markers = [
+    /^읽지\s*않은\s+/,
+    /^안\s*읽은\s+/,
+    /^unread,\s*/i,
+    /^unread\s+/i,
+  ];
+  for (const marker of markers) {
+    if (marker.test(text)) return { name: text.replace(marker, "").trim(), unread: true };
+  }
+  return { name: text, unread: false };
+}
+
 export function normalizeDiscordChannel(
   raw: RawDiscordConversation,
   guildName?: string,
@@ -177,9 +207,10 @@ export function normalizeDiscordChannel(
   const { guildId, channelId } = channelHrefParts(raw.href);
   if (!guildId || !channelId) return undefined;
   // The aria-label is `<name> (<localized type>)` and may carry further
-  // localized qualifiers after it ("…, 비공개 채널"), so the name is simply
-  // everything before the first parenthesis.
-  const name = collapseWhitespace(collapseWhitespace(raw.title).split(" (")[0] ?? "");
+  // localized qualifiers after it ("…, 비공개 채널"), so the name is everything
+  // before the first parenthesis — and an unread row puts a marker in front.
+  const label = collapseWhitespace(raw.title).split(" (")[0] ?? "";
+  const { name, unread: unreadFromLabel } = readUnreadLabel(label);
   if (!name) return undefined;
   const server = collapseWhitespace(guildName ?? "");
   return {
@@ -187,7 +218,7 @@ export function normalizeDiscordChannel(
     href: raw.href,
     // The section already names the server, so the row itself stays short.
     title: `#${name}`,
-    unread: Boolean(raw.unreadHint),
+    unread: unreadFromLabel || Boolean(raw.unreadHint),
     group: server || "서버",
   };
 }
@@ -312,15 +343,41 @@ export function mergeDiscordMessages(
       : update;
   });
 
+  // Within the span the DOM is currently showing, the DOM is the truth. A
+  // sent message is drawn immediately under a temporary id and then replaced
+  // by the confirmed one, so the temporary row would otherwise stay in
+  // history forever and the message would read as if it had been sent twice.
+  // Anything outside that span is history we scrolled to and must be kept.
+  const incomingIds = new Set(incoming.map((message) => message.id));
+  const oldest = incoming[0]?.id ?? "";
+  const newest = incoming.at(-1)?.id ?? "";
+  const survives = (message: ChatMessage): boolean => {
+    if (incomingIds.has(message.id)) return true;
+    const beforeWindow = isOlderSnowflake(message.id, oldest);
+    const afterWindow = isOlderSnowflake(newest, message.id);
+    return beforeWindow || afterWindow;
+  };
+  const kept = merged.filter(survives);
+
   const fresh = incoming.filter((message) => !existingIds.has(message.id));
-  if (fresh.length === 0) return merged;
+  if (fresh.length === 0) return kept;
 
   // Snowflakes are monotonic, so anything below the oldest kept row is history
   // fetched by scrolling up and everything else is new traffic.
-  const oldestKept = merged[0]?.id ?? "";
+  const combined = [...kept, ...fresh];
+  // Snowflakes are monotonic, so sorting restores the true order — including
+  // for a message that belongs between two rows we already had.
+  if (combined.every((message) => /^\d+$/.test(message.id))) {
+    return combined.sort((left, right) =>
+      isOlderSnowflake(left.id, right.id) ? -1 : left.id === right.id ? 0 : 1,
+    );
+  }
+  // A row without a snowflake fell back to a positional id; keep the older
+  // before/after split rather than sorting ids that carry no order.
+  const oldestKept = kept[0]?.id ?? "";
   const older = fresh.filter((message) => isOlderSnowflake(message.id, oldestKept));
   const newer = fresh.filter((message) => !isOlderSnowflake(message.id, oldestKept));
-  return [...older, ...merged, ...newer];
+  return [...older, ...kept, ...newer];
 }
 
 function isOlderSnowflake(candidate: string, reference: string): boolean {
@@ -379,7 +436,9 @@ export function readDiscordConversationRows(elements: Element[]): RawDiscordConv
       href: anchor.getAttribute("href") ?? "",
       nameColor: getComputedStyle(nameNode).color,
       backgroundColor: getComputedStyle(document.body).backgroundColor,
-      title: parts[0] ?? label,
+      // The accessible name is what carries the unread marker; the visible
+      // text does not.
+      title: /^(읽지\s*않은|안\s*읽은|unread)/i.test(label) ? label : parts[0] ?? label,
       preview: parts.slice(1).join(" · ") || undefined,
       // Discord renders the unread pill as a sibling of the link and mirrors
       // the count into the tab title; the badge element is the reliable half.
@@ -520,6 +579,7 @@ export function readDiscordGuildChannels(elements: Element[]): RawDiscordConvers
       title: anchor.getAttribute("aria-label") ?? "",
       nameColor: getComputedStyle(nameNode).color,
       backgroundColor: getComputedStyle(document.body).backgroundColor,
+      active: anchor.getAttribute("aria-current") === "page",
       unreadHint:
         row.querySelector('[class*="numberBadge"], [class*="mention"]') !== null,
     };

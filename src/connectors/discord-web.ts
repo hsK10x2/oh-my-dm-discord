@@ -25,7 +25,6 @@ import {
   mergeDiscordMessages,
   expandDiscordFolders,
   isDiscordGuildId,
-  markUnreadByContrast,
   normalizeDiscordChannel,
   normalizeDiscordConversation,
   normalizeDiscordMessage,
@@ -389,7 +388,7 @@ export class DiscordWebConnector extends EventEmitter implements ChatConnector {
         .evaluateAll(readDiscordGuildChannels)
         .catch(() => [] as RawDiscordConversation[]) as RawDiscordConversation[];
       const name = this.guilds.get(guildId);
-      const channels = markUnreadByContrast(rows)
+      const channels = rows
         .map((row) => normalizeDiscordChannel(row, name))
         .filter((item): item is Conversation => item !== undefined);
       this.guildChannels = mergeDiscordConversations(this.guildChannels, channels);
@@ -575,7 +574,7 @@ export class DiscordWebConnector extends EventEmitter implements ChatConnector {
         .locator(DM_ROW_SELECTOR)
         .evaluateAll(readDiscordConversationRows) as RawDiscordConversation[];
       const captured = dedupeConversations(
-        markUnreadByContrast(rawConversations)
+        rawConversations
           .map(normalizeDiscordConversation)
           .filter((item): item is Conversation => item !== undefined),
       );

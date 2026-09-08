@@ -11,6 +11,7 @@ import {
   channelHrefParts,
   isDiscordGuildId,
   markUnreadByContrast,
+  readUnreadLabel,
   normalizeDiscordChannel,
   normalizeDiscordConversation,
   normalizeDiscordMessage,
@@ -335,4 +336,85 @@ test("이미 확정된 unreadHint는 대비 규칙이 뒤집지 않는다", () =
     { nameColor: "oklab(0.988 0 0)" },
   ];
   assert.deepEqual(markUnreadByContrast(rows).map((r) => Boolean(r.unreadHint)), [true, false, true]);
+});
+
+test("현재 열려 있는 채널은 밝아도 안읽음으로 표시하지 않는다", () => {
+  // Discord draws the selected row at full contrast, which is the same signal
+  // it uses for unread. Harvesting opens each server's first channel, so
+  // without this every server reported a false unread on its first row.
+  const rows: Array<{ nameColor: string; active?: boolean; unreadHint?: boolean }> = [
+    { nameColor: "oklab(0.988 0 0)", active: true },
+    { nameColor: "oklab(0.608 0 0)" },
+    { nameColor: "oklab(0.608 0 0)" },
+  ];
+  assert.deepEqual(
+    markUnreadByContrast(rows).map((r) => Boolean(r.unreadHint)),
+    [false, false, false],
+  );
+});
+
+test("열려 있는 채널이 있어도 진짜 안읽음은 여전히 잡는다", () => {
+  const rows: Array<{ nameColor: string; active?: boolean; unreadHint?: boolean }> = [
+    { nameColor: "oklab(0.988 0 0)", active: true },
+    { nameColor: "oklab(0.608 0 0)" },
+    { nameColor: "oklab(0.608 0 0)" },
+    { nameColor: "oklab(0.988 0 0)" },
+  ];
+  assert.deepEqual(
+    markUnreadByContrast(rows).map((r) => Boolean(r.unreadHint)),
+    [false, false, false, true],
+  );
+});
+
+test("보이는 구간에서 사라진 메시지는 히스토리에서도 지운다", () => {
+  // A sent message is drawn under a temporary id and then replaced by the
+  // confirmed one. Keeping the temporary row makes it look sent twice.
+  const merged = mergeDiscordMessages(
+    [message("100", "안녕"), message("150", "보내는 중"), message("200", "끝")],
+    [message("100", "안녕"), message("180", "보내는 중"), message("200", "끝")],
+  );
+  assert.deepEqual(merged.map((m) => m.id), ["100", "180", "200"]);
+  assert.equal(merged.filter((m) => m.text === "보내는 중").length, 1);
+});
+
+test("보이는 구간 밖의 과거 메시지는 지우지 않는다", () => {
+  // Older history we scrolled to is not in the current DOM window and must survive.
+  const merged = mergeDiscordMessages(
+    [message("100", "과거"), message("200", "가운데"), message("300", "최신")],
+    [message("200", "가운데"), message("300", "최신")],
+  );
+  assert.deepEqual(merged.map((m) => m.id), ["100", "200", "300"]);
+});
+
+test("aria-label의 안읽음 표식을 읽고 이름에서 떼어낸다", () => {
+  // Discord states unread in the accessible name, which beats guessing from
+  // how brightly the row is drawn.
+  assert.deepEqual(readUnreadLabel("읽지 않은 📢-announcements"), {
+    name: "📢-announcements",
+    unread: true,
+  });
+  assert.deepEqual(readUnreadLabel("unread, 💼┃empregos"), {
+    name: "💼┃empregos",
+    unread: true,
+  });
+  assert.deepEqual(readUnreadLabel("일반"), { name: "일반", unread: false });
+});
+
+test("안읽음 표식이 붙은 채널은 제목이 깨끗하고 unread가 선다", () => {
+  const channel = normalizeDiscordChannel(
+    { href: "/channels/999/123", title: "읽지 않은 📢-announcements (채팅 채널)" },
+    "Claude",
+  );
+  assert.equal(channel?.title, "#📢-announcements");
+  assert.equal(channel?.unread, true);
+  assert.equal(channel?.group, "Claude");
+});
+
+test("안읽음 표식이 붙은 DM도 제목이 깨끗하다", () => {
+  const dm = normalizeDiscordConversation({
+    href: "/channels/@me/1",
+    title: "읽지 않은 김예준",
+  });
+  assert.equal(dm?.title, "김예준");
+  assert.equal(dm?.unread, true);
 });
