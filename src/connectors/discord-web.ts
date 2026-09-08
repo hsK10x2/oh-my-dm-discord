@@ -70,6 +70,7 @@ export class DiscordWebConnector extends EventEmitter implements ChatConnector {
   private guildChannels: Conversation[] = [];
   private foldersExpanded = false;
   private serverSweep?: Promise<void>;
+  private sweepPage?: Page;
   private snapshot: ChatSnapshot = {
     state: "starting",
     conversations: [],
@@ -117,6 +118,7 @@ export class DiscordWebConnector extends EventEmitter implements ChatConnector {
       // Mirrors the Instagram connector: React can remount immediately after
       // an effect cleanup, and the newest intent has to win.
       if (this.desiredRunning) return;
+      await this.closeSweepPage();
       await this.context?.close();
       this.context = undefined;
       this.page = undefined;
@@ -267,42 +269,82 @@ export class DiscordWebConnector extends EventEmitter implements ChatConnector {
   }
 
   /**
-   * Walks every server once, in the background, harvesting its channels. Each
-   * server costs a navigation and a render, so they are taken one at a time and
-   * the snapshot is republished after each — the list fills in progressively
-   * instead of the UI waiting on all of them.
+   * Walks every server once, harvesting its channels.
+   *
+   * The sweep runs on a page of its own rather than the one the user is
+   * looking at. Discord only renders the channel list of the server currently
+   * open, so harvesting means navigating to each in turn — doing that on the
+   * visible page would yank the view around, and guarding against it by
+   * stopping whenever a conversation was open meant the sweep died within
+   * seconds of arriving and most servers never loaded at all.
    */
   private startServerSweep(): void {
     if (this.serverSweep) return;
     this.serverSweep = (async () => {
       try {
+        const page = await this.getSweepPage();
+        if (!page) return;
+
+        if (!this.foldersExpanded) {
+          // A server dragged into a folder is hidden from the rail until the
+          // folder is opened, which is most of them on a busy account.
+          await page.evaluate(expandDiscordFolders).catch(() => 0);
+          await page.waitForTimeout(800);
+          this.foldersExpanded = true;
+        }
+
         for (;;) {
           if (this.stopped || !this.desiredRunning) return;
-          const page = this.getUsablePage();
-          if (!page) return;
-          // Never navigate out from under someone reading a conversation.
-          if (channelIdFromUrl(page.url())) return;
+          if (page.isClosed()) return;
 
-          if (!this.foldersExpanded) {
-            await page.evaluate(expandDiscordFolders).catch(() => 0);
-            await page.waitForTimeout(600);
-            this.foldersExpanded = true;
-          }
           await this.readGuildRail(page);
-
           const next = [...this.guilds.keys()].find((id) => !this.visitedGuilds.has(id));
           if (!next) return;
+
           await this.harvestGuildChannels(page, next);
-          await this.waitForAppShell(page);
-          while (this.refreshRunning) await page.waitForTimeout(25);
-          await this.performRefresh();
+          // Republish after each server so the list fills in progressively
+          // instead of appearing all at once at the end.
+          this.publishConversations();
         }
       } catch {
-        // A sweep is best-effort: the list simply stays as far as it got.
+        // Best-effort: the list simply stays as far as it got.
       } finally {
         this.serverSweep = undefined;
+        await this.closeSweepPage();
       }
     })();
+  }
+
+  private async getSweepPage(): Promise<Page | undefined> {
+    const existing = this.sweepPage;
+    if (existing && !existing.isClosed()) return existing;
+    const context = this.context;
+    if (!context) return undefined;
+    const page = await context.newPage().catch(() => undefined);
+    if (!page) return undefined;
+    this.sweepPage = page;
+    await page.goto(APP_URL, { waitUntil: "domcontentloaded" }).catch(() => undefined);
+    await this.waitForAppShell(page);
+    return page;
+  }
+
+  private async closeSweepPage(): Promise<void> {
+    const page = this.sweepPage;
+    this.sweepPage = undefined;
+    if (page && !page.isClosed()) await page.close().catch(() => undefined);
+  }
+
+  /**
+   * Republishes the current conversation list without re-reading the DOM, so a
+   * background harvest can surface its results without disturbing whatever the
+   * visible page is doing.
+   */
+  private publishConversations(): void {
+    if (this.snapshot.state !== "connected") return;
+    this.updateSnapshot({
+      ...this.snapshot,
+      conversations: mergeDiscordConversations(this.snapshot.conversations, this.guildChannels),
+    });
   }
 
   private async readGuildRail(page: Page): Promise<void> {
@@ -318,7 +360,6 @@ export class DiscordWebConnector extends EventEmitter implements ChatConnector {
 
   private async harvestGuildChannels(page: Page, guildId: string): Promise<void> {
     this.visitedGuilds.add(guildId);
-    const returnTo = page.url();
     try {
       await page.goto(`https://discord.com/channels/${guildId}`, {
         waitUntil: "domcontentloaded",
@@ -337,8 +378,8 @@ export class DiscordWebConnector extends EventEmitter implements ChatConnector {
         .map((row) => normalizeDiscordChannel(row, name))
         .filter((item): item is Conversation => item !== undefined);
       this.guildChannels = mergeDiscordConversations(this.guildChannels, channels);
-    } finally {
-      await page.goto(returnTo, { waitUntil: "domcontentloaded" }).catch(() => undefined);
+    } catch {
+      // One unreachable server must not end the sweep for the rest.
     }
   }
 

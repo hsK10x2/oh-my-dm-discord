@@ -1,6 +1,6 @@
 {
   "name": "oh-my-dm-discord",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Fork of oh-my-dm: a discreet Agent CLI-style TUI messenger, with a Discord DM connector added.",
   "license": "Apache-2.0",
   "author": "Hyunwoo Gu <162293672+guhyunwoo@users.noreply.github.com> (original author)",

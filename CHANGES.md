@@ -89,8 +89,17 @@ is the TUI's "I reached the bottom" signal, which is a reasonable place to fetch
 *more* of something — but it is a terrible place to put the only copy of most of
 the sidebar. With nineteen DMs ahead of them, the servers may as well not have
 existed. A background sweep now walks every server once the app is up,
-republishing after each so the list fills in progressively, and it never
-navigates while a conversation is open.
+republishing after each so the list fills in progressively.
+
+The sweep runs on a page of its own. Harvesting means navigating to each server
+in turn, because Discord only renders the channel list of the one currently
+open; doing that on the visible page would yank the view around. Guarding
+against that by stopping whenever a conversation was open — the first attempt —
+was worse: you open a conversation within seconds of arriving, so the sweep died
+there and all but the first server or two never loaded. A second page shares the
+session, navigates freely, and leaves the visible page alone. On the account
+this was built against it now reaches all 19 servers and 179 rooms while a
+conversation stays open.
 
 **Everything was one flat list.** `Conversation` gained an optional `group`, and
 the conversation view draws a heading whenever it changes. Discord puts direct
