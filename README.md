@@ -125,6 +125,7 @@ npx oh-my-dm-discord@latest
 - 사진, 영상, 릴스, 게시물, 이모티콘, 공감, 답장, 수정, 삭제와 시스템 안내를 공통 메시지 타입으로 정규화
 - 그룹 대화의 실제 발신자 이름 표시
 - Discord DM 대화 목록·메시지 조회와 전송
+- Discord 서버 채널 조회와 전송 — 대화 목록을 아래로 넘기면 서버를 하나씩 불러옵니다
 - macOS 카카오톡 대화 목록·메시지 조회와 전송
 - 하나의 통합 대화 목록 사용 및 `/connectors`에서 연결 상태 확인
 - DOM과 WebSocket wake-up signal을 통한 event-driven 업데이트
@@ -178,7 +179,7 @@ oh-my-dm logout instagram
 | Connector | 지원 범위 | 참고 |
 | --- | --- | --- |
 | Instagram | macOS와 Linux에서 CI 검증 | 번들된 Playwright Chromium을 사용합니다. Windows는 아직 공식 검증되지 않았습니다. |
-| Discord | macOS, Linux, Windows | 번들된 Playwright Chromium으로 `discord.com/channels/@me`의 DM을 읽고 씁니다. 개인 DM 전용이며 서버 채널은 다루지 않습니다. |
+| Discord | macOS, Linux, Windows | 번들된 Playwright Chromium으로 DM과 서버 텍스트 채널을 읽고 씁니다. DM은 시작할 때 바로 불러오고, 서버 채널은 대화 목록 끝에서 아래로 넘길 때마다 한 서버씩 추가됩니다(폴더에 접힌 서버도 자동으로 펼칩니다). 음성 채널과 스레드는 다루지 않습니다. |
 | 카카오톡 | macOS 전용 | 데스크톱 카카오톡 앱 로그인과 손쉬운 사용 권한이 필요합니다. Windows 카카오톡은 대화 목록과 메시지 목록을 owner-drawn EVA 컨트롤로 그려서 UI Automation·MSAA 어느 쪽으로도 텍스트를 노출하지 않습니다. 읽을 방법이 없으므로 macOS가 아닌 곳에서는 connector를 등록하지 않습니다. |
 
 텍스트 대화는 전체 내용을 표시합니다. 사진, 영상, 릴스, 게시물, 이모티콘, 공감, 답장, 수정, 삭제와 시스템 안내는 connector와 무관한 공통 메시지 타입으로 정규화하고, 원본 UI에서 확인할 수 있을 때 일관된 텍스트 표식으로 표시합니다. 공유 릴스는 Instagram이 제목을 제공하면 `제목(릴스)`, 제공하지 않으면 `(릴스)`로 표시합니다. 미디어 파일 자체는 다운로드하거나 렌더링하지 않으며, 원본 앱의 보이는 DOM이나 손쉬운 사용 트리에 노출되지 않은 콘텐츠는 생략될 수 있습니다.
@@ -371,6 +372,7 @@ After signing in, press `Ctrl+C` to close the login window. KakaoTalk connects t
 - Normalize photos, videos, Reels, posts, stickers, reactions, replies, edits, deletions, and system notices into shared message types
 - See actual sender names in group conversations
 - Browse and send Discord DMs
+- Browse and send Discord server channels — scrolling past the end of the list pulls in one server at a time
 - Browse and send KakaoTalk messages on macOS
 - Use one unified conversation list and inspect connections with `/connectors`
 - Receive event-driven updates through DOM and WebSocket wake-up signals
@@ -425,7 +427,7 @@ oh-my-dm logout instagram
 | Connector | Support | Notes |
 | --- | --- | --- |
 | Instagram | macOS and Linux are CI-tested | Uses the bundled Playwright Chromium. Windows is not yet officially verified. |
-| Discord | macOS, Linux, Windows | Reads and writes DMs on `discord.com/channels/@me` through the bundled Playwright Chromium. Direct messages only; server channels are out of scope. |
+| Discord | macOS, Linux, Windows | Reads and writes both DMs and server text channels through the bundled Playwright Chromium. DMs load at startup; server channels are added one server at a time as you scroll past the end of the conversation list, expanding collapsed server folders on the way. Voice channels and threads are out of scope. |
 | KakaoTalk | macOS only | Requires the desktop KakaoTalk app, an active login, and Accessibility permission. KakaoTalk for Windows paints its chat list and message list with owner-drawn EVA controls that expose no text through UI Automation or MSAA, so there is nothing to read and the connector is not registered off macOS. |
 
 Text conversations are fully rendered. Photos, videos, Reels, posts, stickers, reactions, replies, edits, deletions, and system notices are normalized into connector-independent message types and shown with consistent text markers when the source UI exposes them. Shared Reels use `title(릴스)` when Instagram provides a title, or `(릴스)` otherwise. Media files themselves are not downloaded or rendered, and content hidden from the source app's visible DOM or accessibility tree may still be omitted.

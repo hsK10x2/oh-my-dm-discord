@@ -51,6 +51,32 @@ not a technical one.
   consecutive messages from the same person. Rows arrive in document order, which
   makes carrying the last header forward exact rather than heuristic.
 
+## Added — Discord server channels
+
+`src/connectors/discord-dom.ts`, `src/connectors/discord-web.ts`
+
+The connector originally covered direct messages only. It now also lists and
+opens server text channels, titled the way a Discord user refers to them —
+`인프 모둠 #일반`.
+
+**Servers are loaded lazily.** Discord renders only the currently selected
+server's channel list, so enumerating every channel means navigating to each
+server in turn. Doing that up front would stall startup behind one full render
+per server, so `loadMoreConversations()` pulls in one more server per call —
+which is what the TUI already invokes when you scroll past the end of the list.
+
+**Collapsed folders are expanded first.** A server dragged into a folder is
+hidden from the rail until the folder is opened, so a plain rail read misses
+most of an account's servers — on the account this was built against, three of
+the six rail entries were folders holding fifteen-plus servers between them.
+The first `loadMoreConversations()` call clicks every collapsed folder open.
+
+**Notes on the DOM.** The rail is built from `div`s rather than links, so it is
+keyed by `[data-list-item-id^="guildsnav___"]`; a real server is the entry whose
+id is a snowflake, which is what separates it from a folder or one of the fixed
+buttons. Server names come from `data-dnd-name`, and channel names from the
+row's `aria-label` — the row's text content also carries its hover actions.
+
 ## Changed — KakaoTalk is registered only on macOS
 
 `src/cli.tsx`
@@ -150,10 +176,26 @@ They are now detected and typed as `system`.
 
 ---
 
+## Fixed — a guild channel could not be opened or read
+
+`src/connectors/discord-web.ts`
+
+`channelIdFromUrl` matched only `/channels/@me/<id>`, so once server channels
+existed the connector could route to one but then failed to recognise it:
+no active conversation, no message history, and no send target. It now shares
+the DM/guild href parser with the rest of the module.
+
+Two smaller ones found while verifying the same path: returning from a server
+left the app shell mid-render, and `performRefresh()` is a no-op in that
+window, so a round's channels reached the snapshot only on the next call; and
+the channel name was taken as everything before a trailing parenthesis, which
+kept the localized qualifiers Discord appends after the channel type
+("토스 (채팅 채널), 비공개 채널").
+
 ## Tests
 
-21 tests added (`test/discord-dom.test.ts`, `test/discord-web.test.ts`, plus an
-N-connector layout case in `test/text-layout.test.ts`); 124 pass.
+26 tests added (`test/discord-dom.test.ts`, `test/discord-web.test.ts`, plus an
+N-connector layout case in `test/text-layout.test.ts`); 129 pass.
 
 ## Account risk
 

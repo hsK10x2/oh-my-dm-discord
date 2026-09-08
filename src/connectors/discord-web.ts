@@ -13,20 +13,29 @@ import type {
 } from "../domain.js";
 import {
   COMPOSER_SELECTOR,
+  channelHrefParts,
   DM_ROW_SELECTOR,
+  GUILD_CHANNEL_SELECTOR,
+  GUILD_RAIL_SELECTOR,
   MESSAGE_LIST_SELECTOR,
   MESSAGE_ROW_SELECTOR,
   inheritDiscordGroupedSenders,
   mergeDiscordConversations,
   mergeDiscordMessages,
+  expandDiscordFolders,
+  isDiscordGuildId,
+  normalizeDiscordChannel,
   normalizeDiscordConversation,
   normalizeDiscordMessage,
   observeDiscordChanges,
   readDiscordConversationRows,
+  readDiscordGuildChannels,
+  readDiscordGuildRail,
   readDiscordPageState,
   readDiscordCurrentUser,
   readDiscordMessageRows,
   type RawDiscordConversation,
+  type RawDiscordGuild,
   type RawDiscordMessage,
 } from "./discord-dom.js";
 
@@ -54,6 +63,11 @@ export class DiscordWebConnector extends EventEmitter implements ChatConnector {
   private lifecycleQueue: Promise<void> = Promise.resolve();
   private temporaryProfileDir?: string;
   private readonly messageHistory = new Map<string, ChatMessage[]>();
+  /** Guild id -> name, filled the first time the rail is read. */
+  private readonly guilds = new Map<string, string>();
+  private readonly visitedGuilds = new Set<string>();
+  private guildChannels: Conversation[] = [];
+  private foldersExpanded = false;
   private snapshot: ChatSnapshot = {
     state: "starting",
     conversations: [],
@@ -113,7 +127,12 @@ export class DiscordWebConnector extends EventEmitter implements ChatConnector {
     const conversation = this.snapshot.conversations.find((item) => item.id === id);
     if (!conversation) throw new Error(`대화를 찾을 수 없습니다: ${id}`);
 
-    await page.goto(`${APP_URL}/${id}`, { waitUntil: "domcontentloaded" });
+    // A DM href is /channels/@me/<id> and a guild channel is
+    // /channels/<guild>/<id>, so the stored href is what makes both routable.
+    const target = conversation.href.startsWith("/")
+      ? `https://discord.com${conversation.href}`
+      : `${APP_URL}/${id}`;
+    await page.goto(target, { waitUntil: "domcontentloaded" });
     // Discord routes instantly but hydrates the message list afterwards.
     // Publishing during that gap would show an empty conversation.
     for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -202,13 +221,84 @@ export class DiscordWebConnector extends EventEmitter implements ChatConnector {
     }
   }
 
+  /**
+   * Pulls in one more server's channels per call. Visiting every server up
+   * front would mean a full navigation and render for each one, so the list
+   * grows as the user scrolls instead.
+   */
   public async loadMoreConversations(): Promise<number> {
     const page = await this.requireReadyPage();
     const before = this.snapshot.conversations.length;
-    await page.locator(DM_ROW_SELECTOR).last().scrollIntoViewIfNeeded().catch(() => undefined);
-    await page.waitForTimeout(200);
+
+    // Servers tucked inside a folder are hidden until it is opened, which is
+    // why an untouched rail can show only a couple of entries.
+    if (!this.foldersExpanded) {
+      await page.evaluate(expandDiscordFolders).catch(() => 0);
+      await page.waitForTimeout(400);
+      this.foldersExpanded = true;
+    }
+    await this.readGuildRail(page);
+
+    const next = [...this.guilds.keys()].find((id) => !this.visitedGuilds.has(id));
+    if (next) await this.harvestGuildChannels(page, next);
+    else {
+      await page.locator(DM_ROW_SELECTOR).last().scrollIntoViewIfNeeded().catch(() => undefined);
+      await page.waitForTimeout(200);
+    }
+
+    // Navigating between guilds schedules its own refresh, and performRefresh()
+    // is a no-op both while one is running and before the app shell has
+    // re-rendered. Without waiting for either, this round's channels would only
+    // reach the snapshot on the next call.
+    await this.waitForAppShell(page);
+    while (this.refreshRunning) await page.waitForTimeout(25);
     await this.performRefresh();
     return Math.max(0, this.snapshot.conversations.length - before);
+  }
+
+  private async waitForAppShell(page: Page): Promise<void> {
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const ready = await page.evaluate(readDiscordPageState).catch(() => null);
+      if (ready?.appReady) return;
+      await page.waitForTimeout(150);
+    }
+  }
+
+  private async readGuildRail(page: Page): Promise<void> {
+    const rail = await page
+      .locator(GUILD_RAIL_SELECTOR)
+      .evaluateAll(readDiscordGuildRail)
+      .catch(() => [] as RawDiscordGuild[]) as RawDiscordGuild[];
+    for (const guild of rail) {
+      if (!isDiscordGuildId(guild.id)) continue;
+      this.guilds.set(guild.id, guild.name?.trim() || guild.id);
+    }
+  }
+
+  private async harvestGuildChannels(page: Page, guildId: string): Promise<void> {
+    this.visitedGuilds.add(guildId);
+    const returnTo = page.url();
+    try {
+      await page.goto(`https://discord.com/channels/${guildId}`, {
+        waitUntil: "domcontentloaded",
+      });
+      // The channel sidebar renders after the route settles.
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        await page.waitForTimeout(200);
+        if (await page.locator(GUILD_CHANNEL_SELECTOR).count()) break;
+      }
+      const rows = await page
+        .locator(GUILD_CHANNEL_SELECTOR)
+        .evaluateAll(readDiscordGuildChannels)
+        .catch(() => [] as RawDiscordConversation[]) as RawDiscordConversation[];
+      const name = this.guilds.get(guildId);
+      const channels = rows
+        .map((row) => normalizeDiscordChannel(row, name))
+        .filter((item): item is Conversation => item !== undefined);
+      this.guildChannels = mergeDiscordConversations(this.guildChannels, channels);
+    } finally {
+      await page.goto(returnTo, { waitUntil: "domcontentloaded" }).catch(() => undefined);
+    }
   }
 
   private async startBrowser(): Promise<void> {
@@ -392,7 +482,12 @@ export class DiscordWebConnector extends EventEmitter implements ChatConnector {
           .map(normalizeDiscordConversation)
           .filter((item): item is Conversation => item !== undefined),
       );
-      const conversations = mergeDiscordConversations(this.snapshot.conversations, captured);
+      // Guild channels are only re-read when the user asks for more, so they
+      // are kept aside and appended rather than being dropped by a DM-only read.
+      const conversations = mergeDiscordConversations(
+        mergeDiscordConversations(this.snapshot.conversations, captured),
+        this.guildChannels,
+      );
 
       const activeConversationId = channelIdFromUrl(url);
       const visibleMessages = activeConversationId
@@ -470,8 +565,13 @@ export class DiscordWebConnector extends EventEmitter implements ChatConnector {
   }
 }
 
+/**
+ * Matches a DM (/channels/@me/<id>) and a guild channel
+ * (/channels/<guild>/<id>) alike — the trailing snowflake is the channel in
+ * both, and it is what keys message history, sending and the active row.
+ */
 export function channelIdFromUrl(url: string): string | undefined {
-  return url.match(/\/channels\/@me\/(\d+)/)?.[1];
+  return channelHrefParts(url).channelId;
 }
 
 export function isTransientDiscordNavigationError(error: unknown): boolean {

@@ -5,6 +5,10 @@ import { normalizeMessageContent } from "../message-content.js";
 // here may depend on them. The selectors below use the id prefixes and data
 // attributes Discord has kept stable for years, plus ARIA roles.
 export const DM_ROW_SELECTOR = 'nav a[href^="/channels/@me/"]';
+// The guild rail is built from divs, not links, so it is keyed by the
+// data-list-item-id Discord puts on each entry.
+export const GUILD_RAIL_SELECTOR = '[data-list-item-id^="guildsnav___"]';
+export const GUILD_CHANNEL_SELECTOR = 'nav a[href^="/channels/"][data-list-item-id^="channels___"]';
 export const MESSAGE_LIST_SELECTOR = '[data-list-id="chat-messages"]';
 export const MESSAGE_ROW_SELECTOR = '[data-list-id="chat-messages"] > li';
 export const COMPOSER_SELECTOR = 'form [role="textbox"][contenteditable="true"]';
@@ -57,6 +61,54 @@ export function normalizeDiscordConversation(
     href: raw.href,
     title,
     ...(preview ? { preview } : {}),
+    unread: Boolean(raw.unreadHint),
+  };
+}
+
+export interface RawDiscordGuild {
+  /** Snowflake for a server; a short numeric id for a folder. */
+  id: string;
+  name?: string | null;
+  unreadHint?: boolean;
+}
+
+/**
+ * A guild id is a snowflake. Folder entries and the fixed rail buttons
+ * (`home`, `create-join-button`, …) share the same attribute, so length is
+ * what separates a real server from a folder that merely groups them.
+ */
+export function isDiscordGuildId(value: string): boolean {
+  return /^\d{17,}$/.test(value);
+}
+
+export function channelHrefParts(href: string): { guildId?: string; channelId?: string } {
+  const dm = href.match(/\/channels\/@me\/(\d+)/);
+  if (dm) return { channelId: dm[1] };
+  const guild = href.match(/\/channels\/(\d+)\/(\d+)/);
+  return guild ? { guildId: guild[1], channelId: guild[2] } : {};
+}
+
+/**
+ * Discord names a channel row `<name> (<localized type>)` in its aria-label,
+ * which is the only place the bare name appears — the row's text content also
+ * carries the hover actions ("채널 편집" and friends).
+ */
+export function normalizeDiscordChannel(
+  raw: RawDiscordConversation,
+  guildName?: string,
+): Conversation | undefined {
+  const { guildId, channelId } = channelHrefParts(raw.href);
+  if (!guildId || !channelId) return undefined;
+  // The aria-label is `<name> (<localized type>)` and may carry further
+  // localized qualifiers after it ("…, 비공개 채널"), so the name is simply
+  // everything before the first parenthesis.
+  const name = collapseWhitespace(collapseWhitespace(raw.title).split(" (")[0] ?? "");
+  if (!name) return undefined;
+  const server = collapseWhitespace(guildName ?? "");
+  return {
+    id: channelId,
+    href: raw.href,
+    title: server ? `${server} #${name}` : `#${name}`,
     unread: Boolean(raw.unreadHint),
   };
 }
@@ -355,6 +407,51 @@ export function readDiscordPageState(): DiscordPageState {
       document.querySelector('nav a[href^="/channels/@me/"]') !== null ||
       document.querySelector('a[href="/channels/@me"]') !== null,
   };
+}
+
+export function readDiscordGuildRail(elements: Element[]): RawDiscordGuild[] {
+  return elements.map((element) => {
+    const id = (element.getAttribute("data-list-item-id") ?? "").replace("guildsnav___", "");
+    // Discord hangs the server name on a wrapper that sits above the rail
+    // entry as often as inside it, so all three positions are checked.
+    const named =
+      element.querySelector("[data-dnd-name]") ??
+      element.closest("[data-dnd-name]") ??
+      element.parentElement?.querySelector("[data-dnd-name]") ??
+      null;
+    const badge = element.querySelector('[class*="numberBadge"], [class*="badge"]');
+    return {
+      id,
+      name: named?.getAttribute("data-dnd-name") ?? null,
+      unreadHint: badge !== null,
+    };
+  });
+}
+
+export function readDiscordGuildChannels(elements: Element[]): RawDiscordConversation[] {
+  return elements.map((element) => {
+    const anchor = element as HTMLAnchorElement;
+    const row = anchor.closest("li") ?? anchor;
+    return {
+      href: anchor.getAttribute("href") ?? "",
+      title: anchor.getAttribute("aria-label") ?? "",
+      unreadHint:
+        row.querySelector('[class*="numberBadge"], [class*="unread"]') !== null,
+    };
+  });
+}
+
+/**
+ * Servers grouped into a folder are hidden until the folder is opened, which
+ * is why a rail read can miss most of an account's servers. Clicking each
+ * closed folder reveals them.
+ */
+export function expandDiscordFolders(): number {
+  const folders = [...document.querySelectorAll('[aria-expanded="false"]')].filter(
+    (element) => element.closest('[data-list-item-id^="guildsnav___"]') !== null,
+  );
+  for (const folder of folders) (folder as HTMLElement).click();
+  return folders.length;
 }
 
 export function observeDiscordChanges(): void {

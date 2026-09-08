@@ -8,6 +8,9 @@ import {
   mergeDiscordConversations,
   mergeDiscordMessages,
   messageIdFromRowId,
+  channelHrefParts,
+  isDiscordGuildId,
+  normalizeDiscordChannel,
   normalizeDiscordConversation,
   normalizeDiscordMessage,
   type RawDiscordMessage,
@@ -236,4 +239,55 @@ test("시스템 알림은 작성자 없는 일반 메시지가 아니라 system�
   );
   assert.equal(notice?.kind, "system");
   assert.notEqual(notice?.sender, "unknown");
+});
+
+test("guild id와 folder id를 구분한다", () => {
+  // A folder groups servers in the rail and shares the same attribute, but its
+  // id is a short counter rather than a snowflake.
+  assert.equal(isDiscordGuildId("1542711875026821141"), true);
+  assert.equal(isDiscordGuildId("3763763090"), false);
+  assert.equal(isDiscordGuildId("home"), false);
+  assert.equal(isDiscordGuildId("create-join-button"), false);
+});
+
+test("DM과 서버 채널 href를 모두 해석한다", () => {
+  assert.deepEqual(channelHrefParts("/channels/@me/123"), { channelId: "123" });
+  assert.deepEqual(channelHrefParts("/channels/999/123"), { guildId: "999", channelId: "123" });
+  assert.deepEqual(channelHrefParts("https://discord.com/channels/999/123"), {
+    guildId: "999",
+    channelId: "123",
+  });
+  assert.deepEqual(channelHrefParts("/channels/999"), {});
+  assert.deepEqual(channelHrefParts("/store"), {});
+});
+
+test("서버 채널 제목은 서버명과 채널명으로 만든다", () => {
+  const channel = normalizeDiscordChannel(
+    { href: "/channels/999/123", title: "일반 (채팅 채널)" },
+    "인프 모둠",
+  );
+  assert.equal(channel?.id, "123");
+  assert.equal(channel?.title, "인프 모둠 #일반");
+  assert.equal(channel?.href, "/channels/999/123");
+});
+
+test("현지화된 수식어가 붙어도 채널명만 잘라낸다", () => {
+  // Discord appends further localized qualifiers after the type, e.g.
+  // "토스 (채팅 채널), 비공개 채널".
+  const channel = normalizeDiscordChannel(
+    { href: "/channels/999/456", title: "토스 (채팅 채널), 비공개 채널" },
+    "기업 탐방 팀",
+  );
+  assert.equal(channel?.title, "기업 탐방 팀 #토스");
+});
+
+test("서버명을 모르면 채널명만 쓰고, DM href는 채널로 만들지 않는다", () => {
+  assert.equal(
+    normalizeDiscordChannel({ href: "/channels/999/123", title: "일반 (채팅 채널)" })?.title,
+    "#일반",
+  );
+  assert.equal(
+    normalizeDiscordChannel({ href: "/channels/@me/123", title: "friend" }),
+    undefined,
+  );
 });
