@@ -4,13 +4,13 @@
   "description": "Fork of oh-my-dm: a discreet Agent CLI-style TUI messenger, with a Discord DM connector added.",
   "license": "Apache-2.0",
   "author": "Hyunwoo Gu <162293672+guhyunwoo@users.noreply.github.com> (original author)",
-  "homepage": "https://github.com/hsK102/oh-my-dm-discord#readme",
+  "homepage": "https://github.com/hsK10x2/oh-my-dm-discord#readme",
   "bugs": {
-    "url": "https://github.com/hsK102/oh-my-dm-discord/issues"
+    "url": "https://github.com/hsK10x2/oh-my-dm-discord/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hsK102/oh-my-dm-discord.git"
+    "url": "git+https://github.com/hsK10x2/oh-my-dm-discord.git"
   },
   "keywords": [
     "cli",
@@ -63,7 +63,7 @@
     "typescript": "^7.0.2"
   },
   "contributors": [
-    "hsK102 <325654781+hsK102@users.noreply.github.com>"
+    "hsK10x2 <325654781+hsK10x2@users.noreply.github.com>"
   ],
   "publishConfig": {
     "access": "public"
