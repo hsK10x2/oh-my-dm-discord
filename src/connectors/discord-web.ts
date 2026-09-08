@@ -14,6 +14,7 @@ import type {
 import {
   COMPOSER_SELECTOR,
   channelHrefParts,
+  clickDiscordGuild,
   DM_ROW_SELECTOR,
   GUILD_CHANNEL_SELECTOR,
   GUILD_RAIL_SELECTOR,
@@ -361,14 +362,28 @@ export class DiscordWebConnector extends EventEmitter implements ChatConnector {
   private async harvestGuildChannels(page: Page, guildId: string): Promise<void> {
     this.visitedGuilds.add(guildId);
     try {
-      await page.goto(`https://discord.com/channels/${guildId}`, {
-        waitUntil: "domcontentloaded",
-      });
-      // The channel sidebar renders after the route settles.
-      for (let attempt = 0; attempt < 20; attempt += 1) {
-        await page.waitForTimeout(200);
-        if (await page.locator(GUILD_CHANNEL_SELECTOR).count()) break;
+      // Route inside the app rather than reloading it. A reload re-initialises
+      // the entire client for every server — an order of magnitude slower, and
+      // it sometimes settled with the channel list still empty.
+      const routed = await page.evaluate(clickDiscordGuild, guildId).catch(() => false);
+      if (routed) {
+        await page
+          .waitForFunction(
+            (id) => location.pathname.startsWith(`/channels/${id}`),
+            guildId,
+            { timeout: 10_000 },
+          )
+          .catch(() => undefined);
+      } else {
+        // The rail entry is missing when its folder collapsed again.
+        await page.goto(`https://discord.com/channels/${guildId}`, {
+          waitUntil: "domcontentloaded",
+        });
       }
+      // Returns as soon as the sidebar is there instead of sleeping in steps.
+      await page
+        .waitForSelector(GUILD_CHANNEL_SELECTOR, { timeout: 15_000 })
+        .catch(() => undefined);
       const rows = await page
         .locator(GUILD_CHANNEL_SELECTOR)
         .evaluateAll(readDiscordGuildChannels)

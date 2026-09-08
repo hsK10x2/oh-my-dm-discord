@@ -98,8 +98,16 @@ against that by stopping whenever a conversation was open — the first attempt 
 was worse: you open a conversation within seconds of arriving, so the sweep died
 there and all but the first server or two never loaded. A second page shares the
 session, navigates freely, and leaves the visible page alone. On the account
-this was built against it now reaches all 19 servers and 179 rooms while a
-conversation stays open.
+this was built against it now reaches every server while a conversation stays
+open.
+
+**Servers are opened by clicking the rail, not by navigating to a URL.**
+`page.goto("/channels/<id>")` reloads the whole application for each server:
+measured at roughly nine seconds each against under one for a click, and a
+reload sometimes settled with the channel list still empty, so the slower path
+was also the one that silently lost channels. Sweeping 21 servers went from
+about 102 seconds to 18, and picked up two servers and seven channels that the
+reload had been dropping.
 
 **Everything was one flat list.** `Conversation` gained an optional `group`, and
 the conversation view draws a heading whenever it changes. Discord puts direct

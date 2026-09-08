@@ -539,6 +539,23 @@ export function expandDiscordFolders(): number {
   return folders.length;
 }
 
+/**
+ * Opens a server by clicking its rail entry.
+ *
+ * Navigating to /channels/<id> instead reloads the whole application —
+ * measured at roughly nine seconds per server against under one for a click,
+ * and a reload sometimes finished with the channel list still empty, so the
+ * slower path was also the one that silently lost channels.
+ */
+export function clickDiscordGuild(guildId: string): boolean {
+  const entry = document.querySelector(`[data-list-item-id="guildsnav___${guildId}"]`);
+  if (!entry) return false;
+  const target = entry.querySelector("a, [role='treeitem']") ?? entry;
+  if (!(target instanceof HTMLElement)) return false;
+  target.click();
+  return true;
+}
+
 export function observeDiscordChanges(): void {
   const key = "__ohMyDmDiscordObserverInstalled";
   const browserWindow = window as typeof window & Record<string, unknown>;
