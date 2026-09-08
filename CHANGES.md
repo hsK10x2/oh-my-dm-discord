@@ -77,6 +77,42 @@ id is a snowflake, which is what separates it from a folder or one of the fixed
 buttons. Server names come from `data-dnd-name`, and channel names from the
 row's `aria-label` — the row's text content also carries its hover actions.
 
+## Changed — the Discord list is sectioned, loads servers on its own, and shows unread
+
+`src/domain.ts`, `src/connectors/discord-dom.ts`, `src/connectors/discord-web.ts`,
+`src/ui/app.tsx`
+
+Three things made the first cut of server support unpleasant to actually use.
+
+**Servers only appeared if you scrolled to the very end.** `loadMoreConversations()`
+is the TUI's "I reached the bottom" signal, which is a reasonable place to fetch
+*more* of something — but it is a terrible place to put the only copy of most of
+the sidebar. With nineteen DMs ahead of them, the servers may as well not have
+existed. A background sweep now walks every server once the app is up,
+republishing after each so the list fills in progressively, and it never
+navigates while a conversation is open.
+
+**Everything was one flat list.** `Conversation` gained an optional `group`, and
+the conversation view draws a heading whenever it changes. Discord puts direct
+messages in one section and each server in its own; connectors with a single
+flat list set nothing and render exactly as before. The row itself is now just
+`#일반` — the server name is the heading above it rather than a prefix repeated
+on every line.
+
+**Unread was never detected.** The previous check looked for a `numberBadge` or
+`unread` class on the row. Measuring the live DOM showed why that finds nothing:
+the only badge element on a DM row is the 14×14 presence dot, and it carries no
+text; unread is communicated purely by drawing the name at full contrast while
+read rows are dimmed. `markUnreadByContrast` therefore derives the rule from the
+list itself — the colour most rows share is the read colour, and a row standing
+further from the background than that is unread. Judging against the background
+rather than an absolute brightness is what makes it hold in both themes, and
+self-calibrating on the majority means a palette change does not break it.
+
+On the account this was built against the result matches Discord's own count
+exactly: two unread, both in servers, which is what `document.title` reported as
+`(2) Discord`.
+
 ## Changed — KakaoTalk is registered only on macOS
 
 `src/cli.tsx`
@@ -194,8 +230,8 @@ kept the localized qualifiers Discord appends after the channel type
 
 ## Tests
 
-26 tests added (`test/discord-dom.test.ts`, `test/discord-web.test.ts`, plus an
-N-connector layout case in `test/text-layout.test.ts`); 129 pass.
+31 tests added (`test/discord-dom.test.ts`, `test/discord-web.test.ts`, plus an
+N-connector layout case in `test/text-layout.test.ts`); 134 pass.
 
 ## Account risk
 

@@ -24,6 +24,7 @@ import {
   mergeDiscordMessages,
   expandDiscordFolders,
   isDiscordGuildId,
+  markUnreadByContrast,
   normalizeDiscordChannel,
   normalizeDiscordConversation,
   normalizeDiscordMessage,
@@ -68,6 +69,7 @@ export class DiscordWebConnector extends EventEmitter implements ChatConnector {
   private readonly visitedGuilds = new Set<string>();
   private guildChannels: Conversation[] = [];
   private foldersExpanded = false;
+  private serverSweep?: Promise<void>;
   private snapshot: ChatSnapshot = {
     state: "starting",
     conversations: [],
@@ -264,6 +266,45 @@ export class DiscordWebConnector extends EventEmitter implements ChatConnector {
     }
   }
 
+  /**
+   * Walks every server once, in the background, harvesting its channels. Each
+   * server costs a navigation and a render, so they are taken one at a time and
+   * the snapshot is republished after each — the list fills in progressively
+   * instead of the UI waiting on all of them.
+   */
+  private startServerSweep(): void {
+    if (this.serverSweep) return;
+    this.serverSweep = (async () => {
+      try {
+        for (;;) {
+          if (this.stopped || !this.desiredRunning) return;
+          const page = this.getUsablePage();
+          if (!page) return;
+          // Never navigate out from under someone reading a conversation.
+          if (channelIdFromUrl(page.url())) return;
+
+          if (!this.foldersExpanded) {
+            await page.evaluate(expandDiscordFolders).catch(() => 0);
+            await page.waitForTimeout(600);
+            this.foldersExpanded = true;
+          }
+          await this.readGuildRail(page);
+
+          const next = [...this.guilds.keys()].find((id) => !this.visitedGuilds.has(id));
+          if (!next) return;
+          await this.harvestGuildChannels(page, next);
+          await this.waitForAppShell(page);
+          while (this.refreshRunning) await page.waitForTimeout(25);
+          await this.performRefresh();
+        }
+      } catch {
+        // A sweep is best-effort: the list simply stays as far as it got.
+      } finally {
+        this.serverSweep = undefined;
+      }
+    })();
+  }
+
   private async readGuildRail(page: Page): Promise<void> {
     const rail = await page
       .locator(GUILD_RAIL_SELECTOR)
@@ -292,7 +333,7 @@ export class DiscordWebConnector extends EventEmitter implements ChatConnector {
         .evaluateAll(readDiscordGuildChannels)
         .catch(() => [] as RawDiscordConversation[]) as RawDiscordConversation[];
       const name = this.guilds.get(guildId);
-      const channels = rows
+      const channels = markUnreadByContrast(rows)
         .map((row) => normalizeDiscordChannel(row, name))
         .filter((item): item is Conversation => item !== undefined);
       this.guildChannels = mergeDiscordConversations(this.guildChannels, channels);
@@ -478,7 +519,7 @@ export class DiscordWebConnector extends EventEmitter implements ChatConnector {
         .locator(DM_ROW_SELECTOR)
         .evaluateAll(readDiscordConversationRows) as RawDiscordConversation[];
       const captured = dedupeConversations(
-        rawConversations
+        markUnreadByContrast(rawConversations)
           .map(normalizeDiscordConversation)
           .filter((item): item is Conversation => item !== undefined),
       );
@@ -504,6 +545,11 @@ export class DiscordWebConnector extends EventEmitter implements ChatConnector {
           : merged.slice(-MESSAGE_LIMIT);
         this.messageHistory.set(activeConversationId, messages);
       }
+
+      // Servers are what the sidebar is mostly made of, so they should be
+      // there on arrival rather than only after scrolling to the end of the
+      // DM list. The sweep runs in the background and republishes as it goes.
+      this.startServerSweep();
 
       this.updateSnapshot({
         state: "connected",

@@ -1167,6 +1167,11 @@ export function App({
               conversationWindow.items.map((conversation, index) => {
                 const absoluteIndex = conversationWindow.start + index;
                 const selected = absoluteIndex === selectedIndex;
+                // Discord returns direct messages and one section per server;
+                // connectors with a single flat list set no group at all.
+                const group = conversation.group;
+                const previous = conversations[absoluteIndex - 1];
+                const startsGroup = Boolean(group) && previous?.group !== group;
                 const selectionMark = selected ? "> " : "  ";
                 const unreadMark = conversation.unread ? " ●" : "  ";
                 const rowProvider = conversation.provider ?? FALLBACK_PROVIDER;
@@ -1187,7 +1192,15 @@ export function App({
                   conversationPreviewWidth,
                 );
                 return (
-                  <Box key={conversation.id} width={conversationContentWidth}>
+                  <Box key={conversation.id} flexDirection="column">
+                    {startsGroup && (
+                      <Box width={conversationContentWidth}>
+                        <Text color={providerColor} bold>
+                          {truncateToWidth(`— ${group} `, conversationContentWidth)}
+                        </Text>
+                      </Box>
+                    )}
+                    <Box width={conversationContentWidth}>
                     <Box width={2} flexShrink={0}>
                       <Text color={selected ? theme.accent : undefined}>
                         {selectionMark}
@@ -1209,6 +1222,7 @@ export function App({
                         <Text color={theme.muted}>{` ${preview}`}</Text>
                       </Box>
                     )}
+                    </Box>
                   </Box>
                 );
               })

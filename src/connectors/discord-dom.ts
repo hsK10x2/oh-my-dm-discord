@@ -20,6 +20,14 @@ export interface RawDiscordConversation {
   title: string;
   preview?: string;
   unreadHint?: boolean;
+  /**
+   * Computed colour of the row's name. Discord signals unread by rendering
+   * the name at full contrast and read rows dimmed, and exposes that
+   * nowhere else — no class, no attribute. See markUnreadByContrast.
+   */
+  nameColor?: string;
+  /** Sidebar background, so contrast can be judged without assuming a theme. */
+  backgroundColor?: string;
 }
 
 export interface RawDiscordMessage {
@@ -48,6 +56,74 @@ export function messageIdFromRowId(rowId: string): string | undefined {
   return rowId.match(/^chat-messages-(?:\d+-)?(\d+)$/)?.[1];
 }
 
+/**
+ * Discord marks a row unread purely visually: the name is drawn at full
+ * contrast against the sidebar while read rows are dimmed toward it. There is
+ * no class or attribute to key off.
+ *
+ * The rule is therefore relative to the background rather than to an absolute
+ * brightness — whatever colour most rows share is the read colour, and a row
+ * standing further from the background than that is unread. Comparing against
+ * the background is what makes this hold in both themes: unread is brighter on
+ * a dark sidebar and darker on a light one, but always further away.
+ */
+export function markUnreadByContrast<T extends {
+  nameColor?: string;
+  backgroundColor?: string;
+  unreadHint?: boolean;
+}>(rows: T[]): T[] {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    if (!row.nameColor) continue;
+    counts.set(row.nameColor, (counts.get(row.nameColor) ?? 0) + 1);
+  }
+  let readColor: string | undefined;
+  let best = 0;
+  for (const [color, count] of counts) {
+    if (count > best) { best = count; readColor = color; }
+  }
+  // A list where every row shares one colour tells us nothing either way.
+  if (!readColor || counts.size < 2) return rows;
+
+  const readLuminance = approximateLuminance(readColor);
+  if (readLuminance === undefined) return rows;
+  const background = rows.find((row) => row.backgroundColor)?.backgroundColor;
+  // Discord's sidebar is dark by default, so that is the fallback when the
+  // page did not report a background.
+  const backgroundLuminance = background ? approximateLuminance(background) ?? 0 : 0;
+  const readContrast = Math.abs(readLuminance - backgroundLuminance);
+
+  return rows.map((row) => {
+    if (row.unreadHint) return row;
+    if (!row.nameColor || row.nameColor === readColor) return row;
+    const luminance = approximateLuminance(row.nameColor);
+    if (luminance === undefined) return row;
+    return Math.abs(luminance - backgroundLuminance) > readContrast
+      ? { ...row, unreadHint: true }
+      : row;
+  });
+}
+
+/** Rough lightness for `oklab(L …)`, `rgb(r g b)` and `#rrggbb`. */
+export function approximateLuminance(color: string): number | undefined {
+  const oklab = color.match(/oklab\(\s*([\d.]+)/i);
+  if (oklab) return Number(oklab[1]);
+  const rgb = color.match(/rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/i);
+  if (rgb) {
+    return (0.2126 * Number(rgb[1]) + 0.7152 * Number(rgb[2]) + 0.0722 * Number(rgb[3])) / 255;
+  }
+  const hex = color.match(/^#([0-9a-f]{6})$/i);
+  if (hex) {
+    const value = Number.parseInt(hex[1]!, 16);
+    return (
+      (0.2126 * ((value >> 16) & 255) +
+        0.7152 * ((value >> 8) & 255) +
+        0.0722 * (value & 255)) / 255
+    );
+  }
+  return undefined;
+}
+
 export function normalizeDiscordConversation(
   raw: RawDiscordConversation,
 ): Conversation | undefined {
@@ -62,6 +138,7 @@ export function normalizeDiscordConversation(
     title,
     ...(preview ? { preview } : {}),
     unread: Boolean(raw.unreadHint),
+    group: "다이렉트 메시지",
   };
 }
 
@@ -108,8 +185,10 @@ export function normalizeDiscordChannel(
   return {
     id: channelId,
     href: raw.href,
-    title: server ? `${server} #${name}` : `#${name}`,
+    // The section already names the server, so the row itself stays short.
+    title: `#${name}`,
     unread: Boolean(raw.unreadHint),
+    group: server || "서버",
   };
 }
 
@@ -295,8 +374,11 @@ export function readDiscordConversationRows(elements: Element[]): RawDiscordConv
       ),
     ];
     const label = anchor.getAttribute("aria-label") ?? "";
+    const nameNode = anchor.querySelector('[class*="name"]') ?? anchor;
     return {
       href: anchor.getAttribute("href") ?? "",
+      nameColor: getComputedStyle(nameNode).color,
+      backgroundColor: getComputedStyle(document.body).backgroundColor,
       title: parts[0] ?? label,
       preview: parts.slice(1).join(" · ") || undefined,
       // Discord renders the unread pill as a sibling of the link and mirrors
@@ -432,11 +514,14 @@ export function readDiscordGuildChannels(elements: Element[]): RawDiscordConvers
   return elements.map((element) => {
     const anchor = element as HTMLAnchorElement;
     const row = anchor.closest("li") ?? anchor;
+    const nameNode = anchor.querySelector('[class*="name"]') ?? anchor;
     return {
       href: anchor.getAttribute("href") ?? "",
       title: anchor.getAttribute("aria-label") ?? "",
+      nameColor: getComputedStyle(nameNode).color,
+      backgroundColor: getComputedStyle(document.body).backgroundColor,
       unreadHint:
-        row.querySelector('[class*="numberBadge"], [class*="unread"]') !== null,
+        row.querySelector('[class*="numberBadge"], [class*="mention"]') !== null,
     };
   });
 }

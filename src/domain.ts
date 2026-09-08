@@ -13,6 +13,12 @@ export interface Conversation {
   href: string;
   preview?: string;
   unread: boolean;
+  /**
+   * Section this row belongs to, rendered as a heading above it. Discord
+   * uses it to keep direct messages and each server apart; connectors that
+   * have one flat list simply leave it unset.
+   */
+  group?: string;
 }
 
 export type MessageKind =

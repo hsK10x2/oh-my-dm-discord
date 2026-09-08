@@ -10,6 +10,7 @@ import {
   messageIdFromRowId,
   channelHrefParts,
   isDiscordGuildId,
+  markUnreadByContrast,
   normalizeDiscordChannel,
   normalizeDiscordConversation,
   normalizeDiscordMessage,
@@ -267,7 +268,9 @@ test("서버 채널 제목은 서버명과 채널명으로 만든다", () => {
     "인프 모둠",
   );
   assert.equal(channel?.id, "123");
-  assert.equal(channel?.title, "인프 모둠 #일반");
+  // The server name is the section heading now, so the row stays short.
+  assert.equal(channel?.title, "#일반");
+  assert.equal(channel?.group, "인프 모둠");
   assert.equal(channel?.href, "/channels/999/123");
 });
 
@@ -278,7 +281,8 @@ test("현지화된 수식어가 붙어도 채널명만 잘라낸다", () => {
     { href: "/channels/999/456", title: "토스 (채팅 채널), 비공개 채널" },
     "기업 탐방 팀",
   );
-  assert.equal(channel?.title, "기업 탐방 팀 #토스");
+  assert.equal(channel?.title, "#토스");
+  assert.equal(channel?.group, "기업 탐방 팀");
 });
 
 test("서버명을 모르면 채널명만 쓰고, DM href는 채널로 만들지 않는다", () => {
@@ -290,4 +294,45 @@ test("서버명을 모르면 채널명만 쓰고, DM href는 채널로 만들지
     normalizeDiscordChannel({ href: "/channels/@me/123", title: "friend" }),
     undefined,
   );
+});
+
+test("DM은 다이렉트 메시지 섹션으로 묶는다", () => {
+  const dm = normalizeDiscordConversation({ href: "/channels/@me/1", title: "friend" });
+  assert.equal(dm?.group, "다이렉트 메시지");
+});
+
+test("가장 흔한 이름 색을 읽음으로 보고 대비가 큰 행만 안읽음으로 표시한다", () => {
+  // Discord dims read rows and draws unread ones at full contrast, and exposes
+  // that nowhere else — no class, no attribute.
+  const rows: Array<{ nameColor: string; backgroundColor?: string; unreadHint?: boolean }> = [
+    { nameColor: "oklab(0.677 0 0)" },
+    { nameColor: "oklab(0.677 0 0)" },
+    { nameColor: "oklab(0.677 0 0)" },
+    { nameColor: "oklab(0.988 0 0)" },
+  ];
+  const marked = markUnreadByContrast(rows);
+  assert.deepEqual(marked.map((r) => Boolean(r.unreadHint)), [false, false, false, true]);
+});
+
+test("한 가지 색뿐이면 아무것도 안읽음으로 만들지 않는다", () => {
+  const rows: Array<{ nameColor: string; backgroundColor?: string; unreadHint?: boolean }> = [{ nameColor: "oklab(0.677 0 0)" }, { nameColor: "oklab(0.677 0 0)" }];
+  assert.deepEqual(markUnreadByContrast(rows).map((r) => Boolean(r.unreadHint)), [false, false]);
+});
+
+test("밝은 테마에서는 더 어두운 행이 안읽음이다", () => {
+  const rows: Array<{ nameColor: string; backgroundColor?: string; unreadHint?: boolean }> = [
+    { nameColor: "rgb(120, 120, 120)", backgroundColor: "rgb(255, 255, 255)" },
+    { nameColor: "rgb(120, 120, 120)", backgroundColor: "rgb(255, 255, 255)" },
+    { nameColor: "rgb(20, 20, 20)", backgroundColor: "rgb(255, 255, 255)" },
+  ];
+  assert.deepEqual(markUnreadByContrast(rows).map((r) => Boolean(r.unreadHint)), [false, false, true]);
+});
+
+test("이미 확정된 unreadHint는 대비 규칙이 뒤집지 않는다", () => {
+  const rows: Array<{ nameColor: string; backgroundColor?: string; unreadHint?: boolean }> = [
+    { nameColor: "oklab(0.677 0 0)", unreadHint: true },
+    { nameColor: "oklab(0.677 0 0)" },
+    { nameColor: "oklab(0.988 0 0)" },
+  ];
+  assert.deepEqual(markUnreadByContrast(rows).map((r) => Boolean(r.unreadHint)), [true, false, true]);
 });
