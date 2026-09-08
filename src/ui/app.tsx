@@ -799,6 +799,29 @@ export function App({
     }
     for (const message of snapshot.messages) {
       if (emittedMessageIds.current.has(message.id)) continue;
+
+      const countInSnapshot = snapshot.messages.filter(
+        (m) => m.sender === message.sender && m.text === message.text,
+      ).length;
+      const countAlreadyEmitted =
+        transcript.filter(
+          (item) =>
+            item.kind === "message" &&
+            item.message.sender === message.sender &&
+            item.message.text === message.text,
+        ).length +
+        additions.filter(
+          (item) =>
+            item.kind === "message" &&
+            item.message.sender === message.sender &&
+            item.message.text === message.text,
+        ).length;
+
+      if (countAlreadyEmitted >= countInSnapshot) {
+        emittedMessageIds.current.add(message.id);
+        continue;
+      }
+
       emittedMessageIds.current.add(message.id);
       additions.push({ id: `message:${conversationId}:${message.id}`, kind: "message", message });
     }
@@ -809,6 +832,7 @@ export function App({
     messagesHidden,
     snapshot.activeConversationId,
     snapshot.messages,
+    transcript,
     viewMode,
     workspaceCleared,
   ]);
